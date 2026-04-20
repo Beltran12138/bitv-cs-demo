@@ -13,7 +13,8 @@ export default function ChatWidget() {
   const [session, setSession] = useState<Session | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
-  const [noMatchCount, setNoMatchCount] = useState(0)
+  const noMatchCountRef = useRef(0)
+  const sessionRef = useRef<Session | null>(null)
   const [isTransferring, setIsTransferring] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -22,7 +23,7 @@ export default function ChatWidget() {
     if (isOpen && !session) {
       initSession()
     }
-  }, [isOpen])
+  }, [isOpen, session])
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -53,6 +54,7 @@ export default function ChatWidget() {
         (payload) => {
           const updated = payload.new as Session
           setSession(updated)
+          sessionRef.current = updated
           if (updated.status === 'human') {
             setIsTransferring(false)
           }
@@ -74,6 +76,7 @@ export default function ChatWidget() {
     })
     const newSession: Session = await res.json()
     setSession(newSession)
+    sessionRef.current = newSession
 
     await supabase.from('messages').insert({
       session_id: newSession.id,
@@ -98,17 +101,17 @@ export default function ChatWidget() {
     const botReply = matchBot(text, language)
 
     if (botReply) {
-      setNoMatchCount(0)
+      noMatchCountRef.current = 0
       await supabase.from('messages').insert({
         session_id: session.id,
         role: 'bot',
         content: botReply,
       })
     } else {
-      const newCount = noMatchCount + 1
-      setNoMatchCount(newCount)
+      noMatchCountRef.current += 1
 
-      if (newCount >= 3) {
+      if (noMatchCountRef.current >= 3) {
+        noMatchCountRef.current = 0
         await triggerTransfer(t[language].autoTransfer)
       } else {
         await supabase.from('messages').insert({
@@ -121,11 +124,12 @@ export default function ChatWidget() {
   }
 
   async function triggerTransfer(message?: string) {
-    if (!session || session.status !== 'bot') return
+    if (!sessionRef.current || sessionRef.current.status !== 'bot') return
+    const currentSession = sessionRef.current
     setIsTransferring(true)
 
     await supabase.from('messages').insert({
-      session_id: session.id,
+      session_id: currentSession.id,
       role: 'bot',
       content: message || t[language].transferring,
     })
@@ -133,7 +137,7 @@ export default function ChatWidget() {
     await supabase
       .from('sessions')
       .update({ status: 'waiting' })
-      .eq('id', session.id)
+      .eq('id', currentSession.id)
   }
 
   async function handleLanguageChange(lang: Language) {
