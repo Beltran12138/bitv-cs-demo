@@ -34,6 +34,16 @@ export default function ChatWidget() {
   useEffect(() => {
     if (!session) return
 
+    // Load existing messages (fixes missing initial load + race condition with greeting)
+    supabase
+      .from('messages')
+      .select('*')
+      .eq('session_id', session.id)
+      .order('created_at')
+      .then(({ data }) => {
+        if (data) setMessages(data as Message[])
+      })
+
     const msgChannel = supabase
       .channel(`messages:${session.id}`)
       .on(
@@ -74,6 +84,7 @@ export default function ChatWidget() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ language }),
     })
+    if (!res.ok) return
     const newSession: Session = await res.json()
     setSession(newSession)
     sessionRef.current = newSession
