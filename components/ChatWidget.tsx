@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase, type Message, type Session } from '@/lib/supabase'
 import { t, type Language } from '@/lib/i18n'
-import { processMessage } from '@/lib/agents'
+import type { ProcessResult } from '@/lib/agents'
 import MessageBubble from './MessageBubble'
 import LanguageSwitcher from './LanguageSwitcher'
 
@@ -19,6 +19,7 @@ export default function ChatWidget() {
   const noMatchCountRef = useRef(0)
   const sessionRef = useRef<Session | null>(null)
   const [isTransferring, setIsTransferring] = useState(false)
+  const [isThinking, setIsThinking] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const waitingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -137,7 +138,25 @@ export default function ChatWidget() {
 
     if (session.status === 'human') return
 
-    const result = processMessage(text, language)
+    setIsThinking(true)
+    let result: ProcessResult
+    try {
+      const res = await fetch('/api/bot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text,
+          language,
+          history: messages.slice(-10).map(m => ({
+            role: m.role === 'user' ? 'user' : 'assistant',
+            content: m.content,
+          })),
+        }),
+      })
+      result = await res.json()
+    } finally {
+      setIsThinking(false)
+    }
 
     // Silence: pure emoji / punctuation
     if (result.intent === 'no_reply') return
@@ -229,6 +248,13 @@ export default function ChatWidget() {
             {messages.map(msg => (
               <MessageBubble key={msg.id} message={msg} language={language} />
             ))}
+            {isThinking && (
+              <div className="flex items-center gap-1 px-3 py-2 mb-2">
+                <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+            )}
             {isTransferring && session?.status === 'waiting' && (
               <div className="text-center text-xs text-amber-400 py-2 animate-pulse">
                 ⏳ {t[language].waitingForAgent}...
