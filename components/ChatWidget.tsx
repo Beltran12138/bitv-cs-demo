@@ -3,9 +3,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase, type Message, type Session } from '@/lib/supabase'
 import { t, type Language } from '@/lib/i18n'
-import { matchBot } from '@/lib/bot-rules'
+import { processMessage } from '@/lib/agents'
 import MessageBubble from './MessageBubble'
 import LanguageSwitcher from './LanguageSwitcher'
+
+const WAITING_TIMEOUT_MS = 3 * 60 * 1000 // 3 minutes
+const MESSAGE_HISTORY_LIMIT = 50
 
 export default function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false)
@@ -17,6 +20,7 @@ export default function ChatWidget() {
   const sessionRef = useRef<Session | null>(null)
   const [isTransferring, setIsTransferring] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const waitingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Open chat → init session
   useEffect(() => {
@@ -30,18 +34,42 @@ export default function ChatWidget() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // Waiting timeout: insert reminder if no agent joins within 3 minutes
+  useEffect(() => {
+    if (session?.status === 'waiting') {
+      waitingTimerRef.current = setTimeout(async () => {
+        if (sessionRef.current?.status === 'waiting') {
+          await supabase.from('messages').insert({
+            session_id: sessionRef.current.id,
+            role: 'bot',
+            content: t[language].waitingTimeout,
+          })
+        }
+      }, WAITING_TIMEOUT_MS)
+    } else {
+      if (waitingTimerRef.current) {
+        clearTimeout(waitingTimerRef.current)
+        waitingTimerRef.current = null
+      }
+    }
+    return () => {
+      if (waitingTimerRef.current) clearTimeout(waitingTimerRef.current)
+    }
+  }, [session?.status])
+
   // Subscribe to Realtime (messages + session status)
   useEffect(() => {
     if (!session) return
 
-    // Load existing messages (fixes missing initial load + race condition with greeting)
+    // Load existing messages (history truncated to last N)
     supabase
       .from('messages')
       .select('*')
       .eq('session_id', session.id)
-      .order('created_at')
+      .order('created_at', { ascending: false })
+      .limit(MESSAGE_HISTORY_LIMIT)
       .then(({ data }) => {
-        if (data) setMessages(data as Message[])
+        if (data) setMessages((data as Message[]).reverse())
       })
 
     const msgChannel = supabase
@@ -109,14 +137,24 @@ export default function ChatWidget() {
 
     if (session.status === 'human') return
 
-    const botReply = matchBot(text, language)
+    const result = processMessage(text, language)
 
-    if (botReply) {
+    // Silence: pure emoji / punctuation
+    if (result.intent === 'no_reply') return
+
+    // Explicit transfer request
+    if (result.shouldTransfer) {
+      noMatchCountRef.current = 0
+      await triggerTransfer(t[language].autoTransfer)
+      return
+    }
+
+    if (result.reply) {
       noMatchCountRef.current = 0
       await supabase.from('messages').insert({
         session_id: session.id,
         role: 'bot',
-        content: botReply,
+        content: result.reply,
       })
     } else {
       noMatchCountRef.current += 1
