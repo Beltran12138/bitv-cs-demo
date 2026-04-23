@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "jest"
+    "test": "jest",
+    "eval": "tsx scripts/ragas-eval.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.103.3",
@@ -27,6 +28,7 @@
     "jest-util": "^29.7.0",
     "tailwindcss": "^4",
     "ts-jest": "^29.4.9",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   },
   "jest": {

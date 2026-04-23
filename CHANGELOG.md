@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 
 ---
 
+## [1.3.0] — 2026-04-23
+
+### Added
+- **RAGAS-style eval script** — `scripts/ragas-eval.ts`; evaluates 10 golden queries end-to-end: intent → context retrieval → DeepSeek answer generation → DeepSeek-as-judge scoring for faithfulness (does answer stay within context?) and answer relevance (does answer address the question?); outputs score table with PASS/WARN thresholds
+- `npm run eval` script; requires `DEEPSEEK_API_KEY`; runs locally on-demand, not in CI
+- `tsx` dev dependency for zero-config TypeScript script execution
+
+---
+
 ## [1.2.0] — 2026-04-23
 
 ### Added
