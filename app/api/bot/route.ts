@@ -7,15 +7,22 @@ import { getKnowledgeContext, formatContext } from '@/lib/knowledge/search'
 import { checkRateLimit } from '@/lib/rate-limit'
 import type { Language } from '@/lib/i18n'
 
-const langfuse = process.env.LANGFUSE_SECRET_KEY
-  ? new Langfuse({
-      publicKey: process.env.LANGFUSE_PUBLIC_KEY,
-      secretKey: process.env.LANGFUSE_SECRET_KEY,
-      baseUrl: process.env.LANGFUSE_HOST ?? 'https://cloud.langfuse.com',
-      flushAt: 1,
-      flushInterval: 0,
-    })
-  : null
+// Lazy singleton — avoids module-level init during Next.js build phase
+let _lf: Langfuse | null | undefined
+function getLangfuse(): Langfuse | null {
+  if (_lf !== undefined) return _lf
+  const sk = process.env.LANGFUSE_SECRET_KEY?.trim()
+  _lf = sk
+    ? new Langfuse({
+        publicKey: process.env.LANGFUSE_PUBLIC_KEY?.trim(),
+        secretKey: sk,
+        baseUrl: process.env.LANGFUSE_HOST?.trim() ?? 'https://cloud.langfuse.com',
+        flushAt: 1,
+        flushInterval: 0,
+      })
+    : null
+  return _lf
+}
 
 const SAFETY_REPLIES: Record<Language, string> = {
   'zh-CN': '温馨提示：请通过 bitV 官方渠道沟通，切勿将账户信息或资金转至平台外，谨防诈骗。',
@@ -38,8 +45,9 @@ export async function POST(req: NextRequest) {
   }
 
   const intent = classifyIntent(message)
+  const lf = getLangfuse()
 
-  const trace = langfuse?.trace({
+  const trace = lf?.trace({
     name: 'bot-request',
     input: { message },
     metadata: { intent, language },
@@ -47,24 +55,24 @@ export async function POST(req: NextRequest) {
 
   if (intent === 'no_reply') {
     trace?.update({ output: null, metadata: { intent } })
-    if (langfuse) await langfuse.flushAsync()
+    if (lf) await lf.flushAsync()
     return NextResponse.json({ reply: null, intent, shouldTransfer: false })
   }
   if (intent === 'safety') {
     trace?.update({ output: SAFETY_REPLIES[language], metadata: { intent } })
-    if (langfuse) await langfuse.flushAsync()
+    if (lf) await lf.flushAsync()
     return NextResponse.json({ reply: SAFETY_REPLIES[language], intent, shouldTransfer: false, traceId: trace?.id })
   }
   if (intent === 'human') {
     trace?.update({ output: 'human-handoff', metadata: { intent } })
-    if (langfuse) await langfuse.flushAsync()
+    if (lf) await lf.flushAsync()
     return NextResponse.json({ reply: null, intent, shouldTransfer: true, traceId: trace?.id })
   }
 
   const apiKey = process.env.DEEPSEEK_API_KEY
   if (!apiKey) {
     const fallback = processMessage(message, language)
-    if (langfuse) await langfuse.flushAsync()
+    if (lf) await lf.flushAsync()
     return NextResponse.json(fallback)
   }
 
@@ -112,11 +120,11 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    if (langfuse) await langfuse.flushAsync()
+    if (lf) await lf.flushAsync()
     return NextResponse.json({ reply, intent, shouldTransfer: false, traceId: trace?.id })
   } catch {
     const fallback = processMessage(message, language)
-    if (langfuse) await langfuse.flushAsync()
+    if (lf) await lf.flushAsync()
     return NextResponse.json(fallback)
   }
 }
