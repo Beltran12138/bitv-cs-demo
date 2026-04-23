@@ -21,6 +21,7 @@ export type ProcessResult = {
   reply: string | null
   intent: Intent
   shouldTransfer: boolean
+  traceId?: string
 }
 
 // ─── Classifier ─────────────────────────────────────────────────────────────

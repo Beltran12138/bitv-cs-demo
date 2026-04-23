@@ -1,10 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { Langfuse } from 'langfuse'
 import { classifyIntent, processMessage } from '@/lib/agents'
 import { SYSTEM_PROMPTS, type AgentPromptKey } from '@/lib/prompts'
 import { getKnowledgeContext, formatContext } from '@/lib/knowledge/search'
 import { checkRateLimit } from '@/lib/rate-limit'
 import type { Language } from '@/lib/i18n'
+
+const langfuse = process.env.LANGFUSE_SECRET_KEY
+  ? new Langfuse({
+      publicKey: process.env.LANGFUSE_PUBLIC_KEY,
+      secretKey: process.env.LANGFUSE_SECRET_KEY,
+      baseUrl: process.env.LANGFUSE_HOST ?? 'https://cloud.langfuse.com',
+      flushAt: 1,
+      flushInterval: 0,
+    })
+  : null
 
 const SAFETY_REPLIES: Record<Language, string> = {
   'zh-CN': '温馨提示：请通过 bitV 官方渠道沟通，切勿将账户信息或资金转至平台外，谨防诈骗。',
@@ -28,28 +39,39 @@ export async function POST(req: NextRequest) {
 
   const intent = classifyIntent(message)
 
+  const trace = langfuse?.trace({
+    name: 'bot-request',
+    input: { message },
+    metadata: { intent, language },
+  })
+
   if (intent === 'no_reply') {
+    trace?.update({ output: null, metadata: { intent } })
+    if (langfuse) await langfuse.flushAsync()
     return NextResponse.json({ reply: null, intent, shouldTransfer: false })
   }
   if (intent === 'safety') {
-    return NextResponse.json({ reply: SAFETY_REPLIES[language], intent, shouldTransfer: false })
+    trace?.update({ output: SAFETY_REPLIES[language], metadata: { intent } })
+    if (langfuse) await langfuse.flushAsync()
+    return NextResponse.json({ reply: SAFETY_REPLIES[language], intent, shouldTransfer: false, traceId: trace?.id })
   }
   if (intent === 'human') {
-    return NextResponse.json({ reply: null, intent, shouldTransfer: true })
+    trace?.update({ output: 'human-handoff', metadata: { intent } })
+    if (langfuse) await langfuse.flushAsync()
+    return NextResponse.json({ reply: null, intent, shouldTransfer: true, traceId: trace?.id })
   }
 
   const apiKey = process.env.DEEPSEEK_API_KEY
   if (!apiKey) {
     const fallback = processMessage(message, language)
+    if (langfuse) await langfuse.flushAsync()
     return NextResponse.json(fallback)
   }
 
   try {
-    // Retrieve relevant FAQ context (vector search or intent-filter fallback)
     const chunks = await getKnowledgeContext(message, intent)
     const contextBlock = formatContext(chunks)
 
-    const client = new OpenAI({ apiKey, baseURL: 'https://api.deepseek.com' })
     const promptKey = (intent in SYSTEM_PROMPTS ? intent : 'default') as AgentPromptKey
 
     const languageInstruction =
@@ -59,21 +81,42 @@ export async function POST(req: NextRequest) {
 
     const systemContent = `${SYSTEM_PROMPTS[promptKey]}${contextBlock}\n\n${languageInstruction}`
 
+    const llmMessages = [
+      { role: 'system' as const, content: systemContent },
+      ...history.slice(-10),
+      { role: 'user' as const, content: message },
+    ]
+
+    const generation = trace?.generation({
+      name: 'deepseek-chat',
+      model: 'deepseek-chat',
+      input: llmMessages,
+      metadata: { intent, promptKey, ragChunks: chunks.length },
+    })
+
+    const client = new OpenAI({ apiKey, baseURL: 'https://api.deepseek.com' })
     const completion = await client.chat.completions.create({
       model: 'deepseek-chat',
-      messages: [
-        { role: 'system', content: systemContent },
-        ...history.slice(-10),
-        { role: 'user', content: message },
-      ],
+      messages: llmMessages,
       max_tokens: 300,
       temperature: 0.3,
     })
 
     const reply = completion.choices[0]?.message?.content?.trim() ?? null
-    return NextResponse.json({ reply, intent, shouldTransfer: false })
+
+    generation?.end({
+      output: reply,
+      usage: {
+        input: completion.usage?.prompt_tokens,
+        output: completion.usage?.completion_tokens,
+      },
+    })
+
+    if (langfuse) await langfuse.flushAsync()
+    return NextResponse.json({ reply, intent, shouldTransfer: false, traceId: trace?.id })
   } catch {
     const fallback = processMessage(message, language)
+    if (langfuse) await langfuse.flushAsync()
     return NextResponse.json(fallback)
   }
 }

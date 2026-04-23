@@ -4,6 +4,19 @@ All notable changes to this project are documented here.
 
 ---
 
+## [1.1.0] — 2026-04-23
+
+### Added
+- **Query rewrite** — DeepSeek rewrites user query into retrieval-optimised form before pgvector embedding; improves recall for ambiguous or colloquial phrasing; falls back to original query on error
+- **Langfuse LLMOps** — optional tracing (`LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY`); every DeepSeek generation is recorded with model, input, output, token usage, intent, and RAG chunk count
+- **Feedback scoring** — `/api/feedback` forwards 👍/👎 rating to Langfuse as a numeric score (`user-feedback`) linked to the originating trace; closes the prompt-iteration loop
+- `traceId` propagated from bot API → ChatWidget → feedback API; bound to Supabase message ID via Realtime insertion order
+
+### Fixed
+- Jest dependency conflict introduced by `langfuse` install; pinned `jest` / `jest-util` to v29
+
+---
+
 ## [1.0.0] — 2026-04-23
 
 ### Added

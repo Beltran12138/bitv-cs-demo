@@ -22,6 +22,32 @@ export async function getKnowledgeContext(
   return intentFilter(intent, topK)
 }
 
+// Rewrites the user query into retrieval-optimised form using DeepSeek.
+// Falls back to original query on any error.
+async function rewriteQuery(query: string): Promise<string> {
+  const apiKey = process.env.DEEPSEEK_API_KEY
+  if (!apiKey) return query
+  try {
+    const client = new OpenAI({ apiKey, baseURL: 'https://api.deepseek.com' })
+    const res = await client.chat.completions.create({
+      model: 'deepseek-chat',
+      messages: [
+        {
+          role: 'system',
+          content:
+            'Rewrite the following user query for semantic search in a crypto exchange FAQ. Make it specific and include relevant technical terms. Output only the rewritten query, nothing else.',
+        },
+        { role: 'user', content: query },
+      ],
+      max_tokens: 80,
+      temperature: 0,
+    })
+    return res.choices[0]?.message?.content?.trim() || query
+  } catch {
+    return query
+  }
+}
+
 async function vectorSearch(
   query: string,
   intent: Intent,
@@ -29,10 +55,11 @@ async function vectorSearch(
   apiKey: string,
 ): Promise<KnowledgeChunk[]> {
   try {
+    const rewritten = await rewriteQuery(query)
     const openai = new OpenAI({ apiKey })
     const { data } = await openai.embeddings.create({
       model: 'text-embedding-3-small',
-      input: query,
+      input: rewritten,
     })
     const embedding = data[0].embedding
 

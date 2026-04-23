@@ -22,8 +22,11 @@ export default function ChatWidget() {
   const [isThinking, setIsThinking] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const waitingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // messageId → 1 | -1 | 'sent' (tracks feedback state)
   const [feedback, setFeedback] = useState<Record<string, 1 | -1 | 'sent'>>({})
+  // Langfuse: traceId waiting to be bound to the next bot message from Realtime
+  const pendingTraceIdRef = useRef<string | null>(null)
+  // messageId → Langfuse traceId
+  const traceIdMapRef = useRef<Record<string, string>>({})
 
   useEffect(() => {
     if (isOpen && !session) {
@@ -77,6 +80,10 @@ export default function ChatWidget() {
         { event: 'INSERT', schema: 'public', table: 'messages', filter: `session_id=eq.${session.id}` },
         (payload) => {
           const newMsg = payload.new as Message
+          if (newMsg.role === 'bot' && pendingTraceIdRef.current) {
+            traceIdMapRef.current[newMsg.id] = pendingTraceIdRef.current
+            pendingTraceIdRef.current = null
+          }
           setMessages(prev => prev.find(m => m.id === newMsg.id) ? prev : [...prev, newMsg])
         }
       )
@@ -151,6 +158,7 @@ export default function ChatWidget() {
         }),
       })
       result = await res.json()
+      if (result.traceId) pendingTraceIdRef.current = result.traceId
     } finally {
       setIsThinking(false)
     }
@@ -213,10 +221,11 @@ export default function ChatWidget() {
   async function submitFeedback(messageId: string, rating: 1 | -1) {
     setFeedback(prev => ({ ...prev, [messageId]: rating }))
     try {
+      const traceId = traceIdMapRef.current[messageId]
       await fetch('/api/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messageId, rating }),
+        body: JSON.stringify({ messageId, rating, ...(traceId && { traceId }) }),
       })
       setTimeout(() => {
         setFeedback(prev => ({ ...prev, [messageId]: 'sent' }))
