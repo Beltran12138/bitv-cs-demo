@@ -92,9 +92,17 @@ async function vectorSearch(
 }
 
 function intentFilter(intent: Intent, topK: number): KnowledgeChunk[] {
-  const filtered = FAQ_DOCS.filter(d => d.intent === intent)
-  if (filtered.length === 0) return []
-  return filtered.slice(0, topK).map(d => ({ title: d.title, content: d.content }))
+  const primary = FAQ_DOCS.filter(d => d.intent === intent)
+  if (primary.length === 0) return []
+  const slice = primary.slice(0, topK)
+  if (slice.length >= topK) return slice.map(d => ({ title: d.title, content: d.content }))
+
+  // fill remaining slots with cross-referenced pages
+  const relatedIds = new Set(slice.flatMap(d => d.related))
+  const extra = FAQ_DOCS
+    .filter(d => relatedIds.has(d.id) && d.intent !== intent)
+    .slice(0, topK - slice.length)
+  return [...slice, ...extra].map(d => ({ title: d.title, content: d.content }))
 }
 
 // Formats chunks into a compact context block for injection into system prompt.

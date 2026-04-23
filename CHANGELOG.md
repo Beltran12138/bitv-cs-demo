@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 
 ---
 
+## [1.2.0] — 2026-04-23
+
+### Added
+- **Wiki knowledge structure** — `KnowledgeDoc` extended with `id` (stable identifier) and `related` (cross-reference IDs); all 19 FAQ pages now form an interlinked wiki graph inspired by Karpathy's LLM Wiki pattern
+- **Cross-reference fallback** — `intentFilter` fills remaining context slots with related pages when primary intent has fewer than `topK` docs (e.g. register query now also surfaces kyc-materials; api query surfaces security-tips)
+- **RAG golden eval** — 10 end-to-end test cases in `lib/knowledge/__tests__/rag-eval.test.ts`; each case validates intent classification AND knowledge retrieval in a single pass; runs in CI without API keys
+
+---
+
 ## [1.1.0] — 2026-04-23
 
 ### Added
