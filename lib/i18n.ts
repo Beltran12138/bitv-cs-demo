@@ -27,6 +27,7 @@ type Translations = {
   noMatchOnce: string
   safetyWarning: string
   waitingTimeout: string
+  feedbackThanks: string
 }
 
 export const t: Record<Language, Translations> = {
@@ -51,6 +52,7 @@ export const t: Record<Language, Translations> = {
     noMatchOnce: '抱歉，我暂时无法解答这个问题，您可以点击"转人工"由专属客服为您服务。',
     safetyWarning: '温馨提示：请通过 bitV 官方渠道沟通，切勿将账户信息或资金转至平台外，谨防诈骗。',
     waitingTimeout: '当前客服繁忙，感谢您的耐心等待。您也可以留下问题，客服会尽快跟进。',
+    feedbackThanks: '感谢您的反馈！',
   },
   'zh-TW': {
     greeting: '您好！我是 bitV 智能客服，請問有什麼可以幫您？',
@@ -73,6 +75,7 @@ export const t: Record<Language, Translations> = {
     noMatchOnce: '抱歉，我暫時無法解答這個問題，您可以點擊「轉人工」由專屬客服為您服務。',
     safetyWarning: '溫馨提示：請通過 bitV 官方渠道溝通，切勿將帳戶資訊或資金轉至平台外，謹防詐騙。',
     waitingTimeout: '當前客服繁忙，感謝您的耐心等待。您也可以留下問題，客服會盡快跟進。',
+    feedbackThanks: '感謝您的反饋！',
   },
   'en': {
     greeting: "Hi! I'm bitV's virtual assistant. How can I help you today?",
@@ -95,5 +98,6 @@ export const t: Record<Language, Translations> = {
     noMatchOnce: "Sorry, I can't answer that. You can click 'Talk to a human' for personalized support.",
     safetyWarning: 'Notice: Please use official bitV channels only. Never share account details or send funds off-platform. Stay safe from scams.',
     waitingTimeout: 'Our agents are currently busy. Thank you for your patience — someone will be with you shortly.',
+    feedbackThanks: 'Thanks for your feedback!',
   },
 }

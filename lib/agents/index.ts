@@ -60,13 +60,20 @@ export function classifyIntent(input: string): Intent {
   if (SAFETY_PHRASES.some(p => lower.includes(p.toLowerCase()))) return 'safety'
   if (HUMAN_KEYWORDS.some(k => lower.includes(k.toLowerCase()))) return 'human'
 
+  // Score each intent by number of keyword hits; return highest score to handle
+  // ambiguous inputs like "永续合约资金费率" (matches both fee and futures).
+  let bestIntent: Intent = 'unknown'
+  let bestScore = 0
+
   for (const [intent, keywords] of Object.entries(INTENT_KEYWORDS)) {
-    if (keywords.some(k => lower.includes(k.toLowerCase()))) {
-      return intent as Intent
+    const score = keywords.filter(k => lower.includes(k.toLowerCase())).length
+    if (score > bestScore) {
+      bestScore = score
+      bestIntent = intent as Intent
     }
   }
 
-  return 'unknown'
+  return bestIntent
 }
 
 // ─── Safety replies ──────────────────────────────────────────────────────────

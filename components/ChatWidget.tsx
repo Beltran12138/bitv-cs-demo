@@ -7,7 +7,7 @@ import type { ProcessResult } from '@/lib/agents'
 import MessageBubble from './MessageBubble'
 import LanguageSwitcher from './LanguageSwitcher'
 
-const WAITING_TIMEOUT_MS = 3 * 60 * 1000 // 3 minutes
+const WAITING_TIMEOUT_MS = 3 * 60 * 1000
 const MESSAGE_HISTORY_LIMIT = 50
 
 export default function ChatWidget() {
@@ -22,20 +22,19 @@ export default function ChatWidget() {
   const [isThinking, setIsThinking] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const waitingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // messageId → 1 | -1 | 'sent' (tracks feedback state)
+  const [feedback, setFeedback] = useState<Record<string, 1 | -1 | 'sent'>>({})
 
-  // Open chat → init session
   useEffect(() => {
     if (isOpen && !session) {
       initSession()
     }
   }, [isOpen, session])
 
-  // Auto-scroll to bottom
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Waiting timeout: insert reminder if no agent joins within 3 minutes
   useEffect(() => {
     if (session?.status === 'waiting') {
       waitingTimerRef.current = setTimeout(async () => {
@@ -58,11 +57,9 @@ export default function ChatWidget() {
     }
   }, [session?.status])
 
-  // Subscribe to Realtime (messages + session status)
   useEffect(() => {
     if (!session) return
 
-    // Load existing messages (history truncated to last N)
     supabase
       .from('messages')
       .select('*')
@@ -158,10 +155,8 @@ export default function ChatWidget() {
       setIsThinking(false)
     }
 
-    // Silence: pure emoji / punctuation
     if (result.intent === 'no_reply') return
 
-    // Explicit transfer request
     if (result.shouldTransfer) {
       noMatchCountRef.current = 0
       await triggerTransfer(t[language].autoTransfer)
@@ -215,6 +210,22 @@ export default function ChatWidget() {
     }
   }
 
+  async function submitFeedback(messageId: string, rating: 1 | -1) {
+    setFeedback(prev => ({ ...prev, [messageId]: rating }))
+    try {
+      await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId, rating }),
+      })
+      setTimeout(() => {
+        setFeedback(prev => ({ ...prev, [messageId]: 'sent' }))
+      }, 800)
+    } catch {
+      // feedback failure is non-critical
+    }
+  }
+
   const canTransfer = session?.status === 'bot' && !isTransferring
 
   return (
@@ -246,7 +257,42 @@ export default function ChatWidget() {
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4">
             {messages.map(msg => (
-              <MessageBubble key={msg.id} message={msg} language={language} />
+              <div key={msg.id}>
+                <MessageBubble message={msg} language={language} />
+                {/* Feedback buttons on bot messages only */}
+                {msg.role === 'bot' && session?.status !== 'waiting' && (
+                  <div className="flex gap-1 mb-2 ml-1">
+                    {feedback[msg.id] === 'sent' ? (
+                      <span className="text-[10px] text-slate-500">{t[language].feedbackThanks}</span>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => submitFeedback(msg.id, 1)}
+                          className={`text-xs px-1.5 py-0.5 rounded transition-colors ${
+                            feedback[msg.id] === 1
+                              ? 'text-green-400'
+                              : 'text-slate-600 hover:text-green-400'
+                          }`}
+                          title="Helpful"
+                        >
+                          👍
+                        </button>
+                        <button
+                          onClick={() => submitFeedback(msg.id, -1)}
+                          className={`text-xs px-1.5 py-0.5 rounded transition-colors ${
+                            feedback[msg.id] === -1
+                              ? 'text-red-400'
+                              : 'text-slate-600 hover:text-red-400'
+                          }`}
+                          title="Not helpful"
+                        >
+                          👎
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
             ))}
             {isThinking && (
               <div className="flex items-center gap-1 px-3 py-2 mb-2">

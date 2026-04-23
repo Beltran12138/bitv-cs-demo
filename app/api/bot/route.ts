@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
-import { classifyIntent } from '@/lib/agents'
+import { classifyIntent, processMessage } from '@/lib/agents'
 import { SYSTEM_PROMPTS, type AgentPromptKey } from '@/lib/prompts'
-import { processMessage } from '@/lib/agents'
+import { getKnowledgeContext, formatContext } from '@/lib/knowledge/search'
+import { checkRateLimit } from '@/lib/rate-limit'
 import type { Language } from '@/lib/i18n'
 
 const SAFETY_REPLIES: Record<Language, string> = {
@@ -14,6 +15,11 @@ const SAFETY_REPLIES: Record<Language, string> = {
 type HistoryMessage = { role: 'user' | 'assistant'; content: string }
 
 export async function POST(req: NextRequest) {
+  const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
+  if (!checkRateLimit(ip)) {
+    return NextResponse.json({ error: 'rate limit exceeded' }, { status: 429 })
+  }
+
   const { message, language, history } = await req.json() as {
     message: string
     language: Language
@@ -34,14 +40,16 @@ export async function POST(req: NextRequest) {
 
   const apiKey = process.env.DEEPSEEK_API_KEY
   if (!apiKey) {
-    // Fallback to keyword matching if API key not configured
     const fallback = processMessage(message, language)
     return NextResponse.json(fallback)
   }
 
   try {
-    const client = new OpenAI({ apiKey, baseURL: 'https://api.deepseek.com' })
+    // Retrieve relevant FAQ context (vector search or intent-filter fallback)
+    const chunks = await getKnowledgeContext(message, intent)
+    const contextBlock = formatContext(chunks)
 
+    const client = new OpenAI({ apiKey, baseURL: 'https://api.deepseek.com' })
     const promptKey = (intent in SYSTEM_PROMPTS ? intent : 'default') as AgentPromptKey
 
     const languageInstruction =
@@ -49,11 +57,13 @@ export async function POST(req: NextRequest) {
       language === 'zh-TW' ? '請用繁體中文回答。' :
       'Please reply in English.'
 
+    const systemContent = `${SYSTEM_PROMPTS[promptKey]}${contextBlock}\n\n${languageInstruction}`
+
     const completion = await client.chat.completions.create({
       model: 'deepseek-chat',
       messages: [
-        { role: 'system', content: `${SYSTEM_PROMPTS[promptKey]}\n\n${languageInstruction}` },
-        ...history.slice(-10), // last 10 messages as context
+        { role: 'system', content: systemContent },
+        ...history.slice(-10),
         { role: 'user', content: message },
       ],
       max_tokens: 300,
@@ -63,7 +73,6 @@ export async function POST(req: NextRequest) {
     const reply = completion.choices[0]?.message?.content?.trim() ?? null
     return NextResponse.json({ reply, intent, shouldTransfer: false })
   } catch {
-    // API error → fallback to keyword matching
     const fallback = processMessage(message, language)
     return NextResponse.json(fallback)
   }
