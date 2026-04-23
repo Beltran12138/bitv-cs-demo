@@ -5,6 +5,7 @@
 [![Supabase](https://img.shields.io/badge/Supabase-Realtime%20%2B%20pgvector-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com/)
 [![DeepSeek](https://img.shields.io/badge/AI-DeepSeek%20Chat-FF6B35)](https://platform.deepseek.com/)
 [![Vercel](https://img.shields.io/badge/Deployed-Vercel-black?logo=vercel)](https://cs-demo-beta.vercel.app/)
+[![CI](https://github.com/Beltran12138/bitv-cs-demo/actions/workflows/ci.yml/badge.svg)](https://github.com/Beltran12138/bitv-cs-demo/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
 A production-ready, multi-agent AI customer service chatbot built for a crypto exchange. Features real-time human handoff, intent-based specialist routing, RAG knowledge base with pgvector, live agent dashboard, and message feedback analytics.
