@@ -128,8 +128,12 @@ Copy `.env.example` to `.env.local`:
 |----------|----------|-------------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon key |
-| `DEEPSEEK_API_KEY` | Yes | DeepSeek API key (chat) |
+| `DEEPSEEK_API_KEY` | Yes | DeepSeek API key (chat + query rewrite) |
 | `OPENAI_API_KEY` | Optional | Enables full pgvector RAG path |
+| `SEED_SECRET` | Optional | Guards `POST /api/seed` against public access |
+| `LANGFUSE_PUBLIC_KEY` | Optional | Langfuse project public key — enables LLM tracing |
+| `LANGFUSE_SECRET_KEY` | Optional | Langfuse project secret key |
+| `LANGFUSE_HOST` | Optional | Langfuse host (default: `https://cloud.langfuse.com`) |
 
 ### Database
 
@@ -161,9 +165,36 @@ The system uses a two-tier retrieval approach:
 Intent classifier routes to one of 9 categories → top-3 matching FAQ chunks are injected as context → DeepSeek generates a grounded reply.
 
 **Production (with `OPENAI_API_KEY`):**
-User query is embedded with `text-embedding-3-small` → cosine similarity search over `knowledge_chunks` via pgvector → top-3 chunks injected as context → DeepSeek generates reply. Automatically activated when key is present.
+User query is first rewritten by DeepSeek into retrieval-optimised form → embedded with `text-embedding-3-small` → cosine similarity search over `knowledge_chunks` via pgvector → top-3 chunks injected as context → DeepSeek generates reply.
 
 Both paths inject context the same way — only the retrieval method changes.
+
+---
+
+## LLMOps — Langfuse Tracing (optional)
+
+When `LANGFUSE_SECRET_KEY` is set, every DeepSeek generation is automatically traced:
+
+| What is captured | Where to see it |
+|-----------------|----------------|
+| Input messages (system prompt + history) | Langfuse → Traces |
+| Output reply | Langfuse → Traces |
+| Token usage (prompt + completion) | Langfuse → Model Cost |
+| Intent, promptKey, RAG chunk count | Langfuse → Metadata |
+| 👍/👎 user feedback score | Langfuse → Scores |
+
+**Setup:**
+1. Create a free project at [cloud.langfuse.com](https://cloud.langfuse.com)
+2. Copy the project's Public Key and Secret Key
+3. Add to `.env.local`:
+   ```
+   LANGFUSE_PUBLIC_KEY=pk-lf-...
+   LANGFUSE_SECRET_KEY=sk-lf-...
+   LANGFUSE_HOST=https://cloud.langfuse.com
+   ```
+4. Restart dev server — traces appear in Langfuse immediately
+
+Without these keys the system runs normally; all Langfuse calls are no-ops.
 
 ---
 
