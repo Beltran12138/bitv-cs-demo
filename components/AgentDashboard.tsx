@@ -159,10 +159,19 @@ export default function AgentDashboard() {
     : 0
 
   return (
-    <div className="flex flex-col h-screen bg-[#0a0f1e]">
+    <div className="flex flex-col h-screen bg-[#080c1a]">
+
+      {/* Brand bar */}
+      <div className="border-b border-white/5 px-5 py-2.5 flex items-center gap-2.5 flex-shrink-0 bg-[#080c1a]">
+        <div className="w-5 h-5 bg-gradient-to-br from-blue-500 to-blue-700 rounded flex items-center justify-center">
+          <span className="text-white font-black text-[10px] leading-none">V</span>
+        </div>
+        <span className="text-white font-semibold text-sm tracking-tight">BitV</span>
+        <span className="text-slate-600 text-xs ml-1">客服工作台</span>
+      </div>
 
       {/* Header */}
-      <div className="border-b border-slate-800 px-4 py-3 flex items-center gap-4 flex-shrink-0">
+      <div className="border-b border-white/5 px-4 py-2.5 flex items-center gap-4 flex-shrink-0 bg-[#080c1a]">
         {/* Tab switcher */}
         <div className="flex gap-1">
           <button
