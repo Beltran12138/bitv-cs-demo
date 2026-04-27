@@ -103,7 +103,11 @@ export async function POST(req: NextRequest) {
       language === 'zh-TW' ? '請用繁體中文回答。' :
       'Please reply in English.'
 
-    const systemContent = `${SYSTEM_PROMPTS[promptKey]}${contextBlock}\n\n${languageInstruction}`
+    const noMarkdown = language === 'en'
+      ? 'Reply in plain text only. No markdown (no **bold**, no # headings, no - bullet symbols, no backticks).'
+      : '请用纯文字回复，禁止使用 Markdown 格式（禁止 **加粗**、# 标题、- 列表符号、代码块等）。'
+
+    const systemContent = `${SYSTEM_PROMPTS[promptKey]}${contextBlock}\n\n${languageInstruction}\n${noMarkdown}`
 
     const llmMessages = [
       { role: 'system' as const, content: systemContent },
