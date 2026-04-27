@@ -1,5 +1,7 @@
 import ChatWidget from '@/components/ChatWidget'
 
+export const dynamic = 'force-dynamic'
+
 export default function ChatPage() {
   return (
     <div className="min-h-screen bg-[#0a0f1e] relative overflow-hidden">
