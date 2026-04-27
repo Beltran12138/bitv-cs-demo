@@ -362,7 +362,7 @@ export default function ChatWidget() {
                 onKeyDown={e => e.key === 'Enter' && handleSend()}
                 placeholder={t[language].placeholder}
                 disabled={session?.status === 'waiting'}
-                className="flex-1 bg-slate-800 rounded-lg px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-blue-500 placeholder-slate-500 disabled:opacity-50"
+                className="flex-1 bg-slate-800 text-white rounded-lg px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-blue-500 placeholder-slate-500 disabled:opacity-50"
               />
               <button
                 onClick={handleSend}
