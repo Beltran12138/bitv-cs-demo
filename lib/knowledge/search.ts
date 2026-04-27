@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { FAQ_DOCS } from './faq'
 import type { Intent } from '@/lib/agents'
 
-export type KnowledgeChunk = { title: string; content: string }
+export type KnowledgeChunk = { title: string; content: string; followUpQuestions?: string[] }
 
 // Returns top-k relevant FAQ chunks for a given query + intent.
 // If OPENAI_API_KEY is set: embed query → pgvector cosine search (production).
@@ -68,7 +68,7 @@ async function vectorSearch(
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     )
 
-    const domainIntent = ['fee','withdraw','kyc','deposit','security','futures','register','api'].includes(intent)
+    const domainIntent = ['fee','withdraw','kyc','deposit','security','futures','register','api','order','account','compliance'].includes(intent)
       ? intent
       : null
 
@@ -95,19 +95,31 @@ function intentFilter(intent: Intent, topK: number): KnowledgeChunk[] {
   const primary = FAQ_DOCS.filter(d => d.intent === intent)
   if (primary.length === 0) return []
   const slice = primary.slice(0, topK)
-  if (slice.length >= topK) return slice.map(d => ({ title: d.title, content: d.content }))
+  const toChunk = (d: typeof FAQ_DOCS[0]): KnowledgeChunk => ({
+    title: d.title,
+    content: d.content,
+    followUpQuestions: d.followUpQuestions,
+  })
+
+  if (slice.length >= topK) return slice.map(toChunk)
 
   // fill remaining slots with cross-referenced pages
   const relatedIds = new Set(slice.flatMap(d => d.related))
   const extra = FAQ_DOCS
     .filter(d => relatedIds.has(d.id) && d.intent !== intent)
     .slice(0, topK - slice.length)
-  return [...slice, ...extra].map(d => ({ title: d.title, content: d.content }))
+  return [...slice, ...extra].map(toChunk)
 }
 
 // Formats chunks into a compact context block for injection into system prompt.
 export function formatContext(chunks: KnowledgeChunk[]): string {
   if (chunks.length === 0) return ''
-  const lines = chunks.map(c => `【${c.title}】\n${c.content}`)
+  const lines = chunks.map(c => {
+    let text = `【${c.title}】\n${c.content}`
+    if (c.followUpQuestions && c.followUpQuestions.length > 0) {
+      text += `\n常見追問：${c.followUpQuestions.join(' / ')}`
+    }
+    return text
+  })
   return `\n\nRelevant knowledge base context (use this to answer accurately):\n${lines.join('\n\n')}`
 }

@@ -4,6 +4,24 @@ All notable changes to this project are documented here.
 
 ---
 
+## [1.4.0] — 2026-04-27
+
+### Added
+- **3 new intents**: `order` (订单/撤单/交易记录), `account` (账户冻结/VIP/余额), `compliance` (税务/AML/制裁)
+- **FAQ expanded 19 → 47 entries**: all existing intents grown to 4–5 entries each, covering failure paths (withdraw frozen, deposit wrong network, 2FA lost, KYC L2, partial fill, etc.)
+- **`followUpQuestions` field** on every `KnowledgeDoc`; injected into system prompt context via `formatContext` so LLM can proactively address follow-up concerns
+- **3 new system prompts**: order specialist, account specialist, compliance specialist
+- **Demo conversation script** (`docs/demo-script.md`): 8 complete multi-turn scenarios covering all major CS use cases
+- **10 new intent classification tests** for order, account, compliance intents (111 total)
+- **3 new RAG golden eval cases** for the new intents (13 total)
+
+### Changed
+- `KnowledgeChunk` type extended with optional `followUpQuestions?: string[]`
+- `formatContext` appends 常見追問 block when followUpQuestions present
+- pgvector domain whitelist extended to include `order`, `account`, `compliance`
+
+---
+
 ## [1.3.0] — 2026-04-23
 
 ### Added

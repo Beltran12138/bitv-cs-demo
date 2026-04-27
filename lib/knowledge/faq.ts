@@ -3,7 +3,8 @@ export type KnowledgeDoc = {
   intent: string
   title: string
   content: string
-  related: string[]  // IDs of cross-referenced wiki pages
+  related: string[]
+  followUpQuestions?: string[]
 }
 
 export const FAQ_DOCS: KnowledgeDoc[] = [
@@ -12,25 +13,41 @@ export const FAQ_DOCS: KnowledgeDoc[] = [
     id: 'fee-spot',
     intent: 'fee',
     title: '现货交易手续费',
-    content:
-      'bitV现货交易手续费：maker = taker = 0.1%。持有BTV平台代币可享受折扣，最低至0.05%。VIP用户可申请更低费率，详情联系客服。',
-    related: ['fee-futures', 'fee-withdraw'],
+    content: 'bitV现货交易手续费：maker = taker = 0.1%。持有BTV平台代币可享受折扣，最低至0.05%。VIP用户可申请更低费率，详情联系客服。',
+    related: ['fee-futures', 'fee-withdraw', 'fee-btv-discount', 'fee-vip-tiers'],
+    followUpQuestions: ['BTV折扣怎么计算？', 'VIP费率如何申请？', '合约手续费是多少？'],
   },
   {
     id: 'fee-futures',
     intent: 'fee',
     title: '合约交易手续费',
-    content:
-      'bitV永续合约手续费：maker 0.02%，taker 0.05%。资金费率每8小时结算一次，具体费率可在合约页面实时查看。',
-    related: ['fee-spot', 'futures-intro'],
+    content: 'bitV永续合约手续费：maker 0.02%，taker 0.05%。资金费率每8小时结算一次，具体费率可在合约页面实时查看。',
+    related: ['fee-spot', 'futures-intro', 'futures-funding-rate'],
+    followUpQuestions: ['资金费率什么时候结算？', '做市商费率怎么申请？'],
   },
   {
     id: 'fee-withdraw',
     intent: 'fee',
     title: '提币手续费',
-    content:
-      '提币手续费根据币种和网络不同而异，请在提币页面查看实时费率。常见参考值：BTC约0.0005 BTC，ETH约0.005 ETH（因网络拥堵可能变动）。',
+    content: '提币手续费根据币种和网络不同而异，请在提币页面查看实时费率。常见参考值：BTC约0.0005 BTC，ETH约0.005 ETH（因网络拥堵可能变动）。',
     related: ['withdraw-steps', 'fee-spot'],
+    followUpQuestions: ['能不能减免提币手续费？', '不同网络手续费一样吗？'],
+  },
+  {
+    id: 'fee-btv-discount',
+    intent: 'fee',
+    title: 'BTV平台币费率折扣',
+    content: '持有BTV平台代币可享手续费折扣：持仓500 BTV享8折（0.08%），持仓5000 BTV享7折（0.07%），持仓50000 BTV享6折（0.06%）。折扣自动生效，无需手动开启，每日00:00 UTC按持仓快照计算。',
+    related: ['fee-spot', 'fee-vip-tiers', 'account-vip'],
+    followUpQuestions: ['BTV折扣和VIP折扣能叠加吗？', 'BTV怎么购买？'],
+  },
+  {
+    id: 'fee-vip-tiers',
+    intent: 'fee',
+    title: 'VIP费率等级',
+    content: 'VIP等级按过去30日现货+合约交易量划分：VIP0（默认，现货0.1%）、VIP1（月交易量≥10万USDT，0.09%）、VIP2（≥100万USDT，0.08%）、VIP3（≥1000万USDT，0.07%）。做市商另有专属费率，请联系BD团队。',
+    related: ['fee-spot', 'account-vip'],
+    followUpQuestions: ['VIP等级每天更新吗？', '做市商费率怎么申请？'],
   },
 
   // ── withdraw ─────────────────────────────────────────────────────────────────
@@ -38,25 +55,41 @@ export const FAQ_DOCS: KnowledgeDoc[] = [
     id: 'withdraw-steps',
     intent: 'withdraw',
     title: '提币操作步骤',
-    content:
-      '提币路径：登录 → 资产 → 提币。选择币种和网络，填写收款地址和数量，确认后提交。务必核对网络类型，错误网络会导致资产永久丢失。',
-    related: ['withdraw-timing', 'fee-withdraw'],
+    content: '提币路径：登录 → 资产 → 提币。选择币种和网络，填写收款地址和数量，确认后提交。务必核对网络类型，错误网络会导致资产永久丢失。',
+    related: ['withdraw-timing', 'fee-withdraw', 'withdraw-frozen', 'withdraw-whitelist'],
+    followUpQuestions: ['提币多久到账？', '提币手续费多少？', '提币被限制怎么办？'],
   },
   {
     id: 'withdraw-timing',
     intent: 'withdraw',
     title: '提币到账时间',
-    content:
-      '提币处理时间通常为1–2个工作日。网络拥堵期间可能延长。提交后可在交易记录中查看TxID，在区块链浏览器追踪进度。',
+    content: '提币处理时间通常为1–2个工作日。网络拥堵期间可能延长。提交后可在交易记录中查看TxID，在区块链浏览器追踪进度。',
     related: ['withdraw-steps', 'withdraw-missing'],
+    followUpQuestions: ['TxID在哪里查看？', '超过2天没到账怎么办？'],
   },
   {
     id: 'withdraw-missing',
     intent: 'withdraw',
     title: '提币未到账处理',
-    content:
-      '若提币超过2个工作日未到账，请携带TxID（交易哈希）提交客服工单。区块链转账不可逆，操作前务必核对地址和网络。',
+    content: '若提币超过2个工作日未到账，请携带TxID（交易哈希）提交客服工单。区块链转账不可逆，操作前务必核对地址和网络。',
     related: ['withdraw-timing', 'deposit-missing'],
+    followUpQuestions: ['TxID在哪里找？', '提错网络能找回吗？'],
+  },
+  {
+    id: 'withdraw-frozen',
+    intent: 'withdraw',
+    title: '提币功能被限制原因',
+    content: '提币功能可能被限制的原因：①账户安全审核（异常登录后24小时冻结）；②KYC信息过期需重新认证；③大额提币需人工审核（通常24小时内完成）；④账户存在未解决的合规问题。解除限制请通过官方渠道提交工单，说明情况并配合提供所需材料。',
+    related: ['withdraw-steps', 'account-frozen', 'kyc-materials', 'security-tips'],
+    followUpQuestions: ['怎么提交工单？', '大额提币审核要多久？', 'KYC怎么重新认证？'],
+  },
+  {
+    id: 'withdraw-whitelist',
+    intent: 'withdraw',
+    title: '提币地址白名单',
+    content: '地址白名单功能：开启后仅允许提币至已绑定地址，有效防止账户被盗后资产转移。路径：安全设置 → 提币地址管理 → 添加白名单。新增地址需经过24小时冷却期后才可使用。',
+    related: ['withdraw-steps', 'security-tips'],
+    followUpQuestions: ['白名单开启后能删除地址吗？', '忘记绑定白名单怎么办？'],
   },
 
   // ── kyc ──────────────────────────────────────────────────────────────────────
@@ -64,25 +97,41 @@ export const FAQ_DOCS: KnowledgeDoc[] = [
     id: 'kyc-materials',
     intent: 'kyc',
     title: 'KYC认证所需材料',
-    content:
-      'KYC认证需要：①政府颁发的有效证件（护照或身份证）；②手持证件的清晰自拍照。审核时间通常为1个工作日内完成。',
-    related: ['kyc-benefits', 'register-steps'],
+    content: 'KYC认证需要：①政府颁发的有效证件（护照或身份证）；②手持证件的清晰自拍照。审核时间通常为1个工作日内完成。',
+    related: ['kyc-benefits', 'register-steps', 'kyc-levels', 'kyc-business'],
+    followUpQuestions: ['KYC审核要多久？', 'KYC被拒怎么办？', 'L2认证怎么申请？'],
   },
   {
     id: 'kyc-benefits',
     intent: 'kyc',
     title: 'KYC认证的好处',
-    content:
-      '完成KYC认证后可解锁更高提币额度和完整平台功能。支持大多数国家和地区，OFAC制裁地区除外。',
-    related: ['kyc-materials', 'register-steps'],
+    content: '完成KYC认证后可解锁更高提币额度和完整平台功能。支持大多数国家和地区，OFAC制裁地区除外。',
+    related: ['kyc-materials', 'register-steps', 'kyc-levels'],
+    followUpQuestions: ['未认证可以交易吗？', 'L1和L2额度有什么区别？'],
   },
   {
     id: 'kyc-rejected',
     intent: 'kyc',
     title: 'KYC被拒或长时间未审核',
-    content:
-      'KYC被拒：检查证件照片清晰度及自拍照是否符合要求（面部清晰、证件完整）。KYC超过2个工作日未处理：提交客服工单，附上提交时间截图。',
-    related: ['kyc-materials'],
+    content: 'KYC被拒：检查证件照片清晰度及自拍照是否符合要求（面部清晰、证件完整可读）。KYC超过2个工作日未处理：提交客服工单，附上提交时间截图。',
+    related: ['kyc-materials', 'kyc-levels'],
+    followUpQuestions: ['重新提交KYC需要等多久？', '什么照片格式可以接受？'],
+  },
+  {
+    id: 'kyc-levels',
+    intent: 'kyc',
+    title: 'KYC等级说明（L1/L2）',
+    content: 'bitV KYC分两级：L1基础认证（邮箱+手机+身份证/护照）提币限额10,000 USDT/天；L2高级认证（L1+视频认证+地址证明）提币限额500,000 USDT/天。L2认证一般由系统自动邀请大额用户或可联系客服申请。',
+    related: ['kyc-materials', 'kyc-benefits', 'account-vip'],
+    followUpQuestions: ['L2认证需要什么材料？', '视频认证怎么做？'],
+  },
+  {
+    id: 'kyc-business',
+    intent: 'kyc',
+    title: '企业/机构账户认证',
+    content: '企业账户认证需提供：①营业执照；②法人身份证件；③公司章程；④股权结构图（持股超25%的股东均需提供）。企业认证流程通常需要3–5个工作日，完成后解锁OTC、大额提币和做市商权限。',
+    related: ['kyc-materials', 'compliance-aml'],
+    followUpQuestions: ['企业认证如何申请入口？', '做市商权限怎么开通？'],
   },
 
   // ── deposit ──────────────────────────────────────────────────────────────────
@@ -90,17 +139,33 @@ export const FAQ_DOCS: KnowledgeDoc[] = [
     id: 'deposit-how',
     intent: 'deposit',
     title: '如何充值入金',
-    content:
-      '充值方式：①加密货币充值：在平台获取充值地址，从外部钱包转入对应网络资产；②法币入金：通过合作支付渠道购买稳定币。选择正确网络至关重要，错误网络会导致资产丢失。',
-    related: ['deposit-missing'],
+    content: '充值方式：①加密货币充值：在平台获取充值地址，从外部钱包转入对应网络资产；②法币入金：通过合作支付渠道购买稳定币。选择正确网络至关重要，错误网络会导致资产丢失。',
+    related: ['deposit-missing', 'deposit-wrong-network', 'deposit-limits'],
+    followUpQuestions: ['充值地址在哪里找？', '法币入金支持哪些渠道？', '充错网络怎么办？'],
   },
   {
     id: 'deposit-missing',
     intent: 'deposit',
     title: '充值未到账处理',
-    content:
-      '充值后1小时未到账：①确认选择网络与发送网络一致；②在区块链浏览器查询TxID确认链上状态；③链上已确认仍未到账请提交含TxID的客服工单。',
+    content: '充值后1小时未到账：①确认选择网络与发送网络一致；②在区块链浏览器查询TxID确认链上状态；③链上已确认仍未到账请提交含TxID的客服工单。',
     related: ['deposit-how', 'withdraw-missing'],
+    followUpQuestions: ['需要多少个确认数才能到账？', '链上确认了平台还没显示怎么办？'],
+  },
+  {
+    id: 'deposit-wrong-network',
+    intent: 'deposit',
+    title: '充错网络资产找回',
+    content: 'bitV支持部分跨链资产找回，但需人工处理且收取服务费（按情况收取）。请提交工单并附上：①发送交易TxID；②发送网络类型；③预期接收网络类型。注意：非标准网络充值无法保证找回，操作前务必核实网络类型。',
+    related: ['deposit-how', 'deposit-missing', 'withdraw-missing'],
+    followUpQuestions: ['找回服务费大概多少？', '找回需要多久？'],
+  },
+  {
+    id: 'deposit-limits',
+    intent: 'deposit',
+    title: '充值限制与小额充值',
+    content: '充值限制说明：①小额充值（低于最小充值额）：资产不会到账，系统退回需等待3–7个工作日；②首次充值需等待区块链确认（通常6个确认后到账）；③不同币种最小充值额不同，请在充值页面查看具体数值。',
+    related: ['deposit-how', 'kyc-levels'],
+    followUpQuestions: ['最小充值额在哪里查？', '充值退回了怎么办？'],
   },
 
   // ── security ─────────────────────────────────────────────────────────────────
@@ -108,17 +173,33 @@ export const FAQ_DOCS: KnowledgeDoc[] = [
     id: 'security-tips',
     intent: 'security',
     title: '账户安全建议',
-    content:
-      '强烈建议开启2FA（Google Authenticator或短信验证）。bitV使用冷存储保管99%用户资产。重要：bitV工作人员永远不会索要您的密码或2FA验证码。',
-    related: ['security-hacked', 'api-security'],
+    content: '强烈建议开启2FA（Google Authenticator或短信验证）。bitV使用冷存储保管99%用户资产。重要：bitV工作人员永远不会索要您的密码或2FA验证码。',
+    related: ['security-hacked', 'api-security', 'security-2fa-lost', 'security-unusual-login'],
+    followUpQuestions: ['2FA怎么开启？', '手机丢了2FA怎么办？', '收到异地登录提醒怎么处理？'],
   },
   {
     id: 'security-hacked',
     intent: 'security',
     title: '账户被盗或疑似入侵处理',
-    content:
-      '发现账户异常：①立即在设置中冻结账户；②修改密码和2FA绑定设备；③通过官方渠道提交工单说明情况，切勿通过第三方处理。',
-    related: ['security-tips'],
+    content: '发现账户异常：①立即在设置中冻结账户；②修改密码和2FA绑定设备；③通过官方渠道提交工单说明情况，切勿通过第三方处理。',
+    related: ['security-tips', 'security-2fa-lost', 'account-frozen'],
+    followUpQuestions: ['账户冻结在哪里操作？', '资产被转走能追回吗？'],
+  },
+  {
+    id: 'security-2fa-lost',
+    intent: 'security',
+    title: '手机丢失/无法使用2FA',
+    content: '手机丢失/2FA无法使用：①若有备用恢复码：在登录页选择"使用恢复码"输入；②若无备用码：提交人工解绑申请，需提供身份证件、视频验证及注册邮箱验证。2FA解绑审核需1–3个工作日，解绑后提币功能冻结24小时。',
+    related: ['security-tips', 'security-hacked'],
+    followUpQuestions: ['恢复码在哪里找？', '解绑审核通过后提币还要等多久？'],
+  },
+  {
+    id: 'security-unusual-login',
+    intent: 'security',
+    title: '异地/异常登录处理',
+    content: '账户检测到异地或异常登录时，系统发送邮件告警并可能暂时限制敏感操作。处理步骤：①立即修改密码；②在设备管理中踢出所有不认识的设备；③检查API Key是否遭到滥用；④开启登录地点白名单（设置→安全→登录保护）。',
+    related: ['security-tips', 'security-hacked', 'api-security'],
+    followUpQuestions: ['设备管理在哪里？', '登录保护怎么设置？'],
   },
 
   // ── futures ──────────────────────────────────────────────────────────────────
@@ -126,17 +207,33 @@ export const FAQ_DOCS: KnowledgeDoc[] = [
     id: 'futures-intro',
     intent: 'futures',
     title: '永续合约交易介绍',
-    content:
-      'bitV提供永续合约交易，最高支持100x杠杆。资金费率每8小时结算一次。新手建议从低杠杆开始，并设置止损订单控制风险。',
-    related: ['futures-liquidation', 'fee-futures'],
+    content: 'bitV提供永续合约交易，最高支持100x杠杆。资金费率每8小时结算一次。新手建议从低杠杆开始，并设置止损订单控制风险。',
+    related: ['futures-liquidation', 'fee-futures', 'futures-funding-rate', 'futures-margin'],
+    followUpQuestions: ['资金费率怎么计算？', '强平机制是什么？', '逐仓和全仓有什么区别？'],
   },
   {
     id: 'futures-liquidation',
     intent: 'futures',
     title: '合约强平机制',
-    content:
-      '当保证金率低于维持保证金水平时触发强平。预防措施：①设置止损订单；②不使用过高杠杆；③保持充足保证金余额。合约交易存在高风险，请量力而行。',
-    related: ['futures-intro', 'security-tips'],
+    content: '当保证金率低于维持保证金水平时触发强平。预防措施：①设置止损订单；②不使用过高杠杆；③保持充足保证金余额。合约交易存在高风险，请量力而行。',
+    related: ['futures-intro', 'futures-margin', 'security-tips'],
+    followUpQuestions: ['怎么追加保证金？', '强平价格在哪里查看？'],
+  },
+  {
+    id: 'futures-funding-rate',
+    intent: 'futures',
+    title: '资金费率说明',
+    content: '资金费率（Funding Rate）每8小时结算（00:00、08:00、16:00 UTC）。费率由多空持仓比例决定：多头>空头时费率为正（多头付给空头），反之则为负。费率通常在±0.1%以内，可在合约页面查看预测费率。',
+    related: ['futures-intro', 'fee-futures'],
+    followUpQuestions: ['怎么避免被收资金费率？', '资金费率为负对我有利吗？'],
+  },
+  {
+    id: 'futures-margin',
+    intent: 'futures',
+    title: '保证金模式与追加保证金',
+    content: '保证金模式：①全仓（Cross Margin）：账户所有可用余额作为保证金，风险共享；②逐仓（Isolated Margin）：每个仓位独立保证金，最大亏损为该仓位保证金。当保证金率接近强平线时，可追加保证金（转入资金至合约账户）或减仓来降低风险。',
+    related: ['futures-intro', 'futures-liquidation'],
+    followUpQuestions: ['怎么切换全仓/逐仓？', '追加保证金后强平价格会变吗？'],
   },
 
   // ── register ─────────────────────────────────────────────────────────────────
@@ -144,17 +241,33 @@ export const FAQ_DOCS: KnowledgeDoc[] = [
     id: 'register-steps',
     intent: 'register',
     title: '注册账户流程',
-    content:
-      '注册步骤：①填写邮箱并设置密码；②验证邮箱（检查垃圾邮件文件夹）；③完成KYC实名认证；④全程约5分钟完成，KYC通过后可使用全部功能。',
-    related: ['kyc-materials', 'register-email'],
+    content: '注册步骤：①填写邮箱并设置密码；②验证邮箱（检查垃圾邮件文件夹）；③完成KYC实名认证；④全程约5分钟完成，KYC通过后可使用全部功能。',
+    related: ['kyc-materials', 'register-email', 'register-invite'],
+    followUpQuestions: ['验证邮件没收到怎么办？', '注册需要填邀请码吗？', 'KYC要多久？'],
   },
   {
     id: 'register-email',
     intent: 'register',
     title: '注册验证邮件未收到',
-    content:
-      '未收到验证邮件：①检查垃圾邮件/广告邮件文件夹；②点击注册页面"重新发送"按钮；③确认邮箱地址拼写正确。等待3分钟仍未收到请联系客服。',
+    content: '未收到验证邮件：①检查垃圾邮件/广告邮件文件夹；②点击注册页面"重新发送"按钮；③确认邮箱地址拼写正确。等待3分钟仍未收到请联系客服。',
     related: ['register-steps'],
+    followUpQuestions: ['重新发送有次数限制吗？', '可以换邮箱重新注册吗？'],
+  },
+  {
+    id: 'register-invite',
+    intent: 'register',
+    title: '邀请码使用说明',
+    content: '邀请码使用：注册时在"邀请码"栏填入好友的邀请码，双方均可享受手续费返佣（具体比例以活动页为准）。注意：邀请码只能在注册时填写，注册后无法补填，也无法追溯绑定。',
+    related: ['register-steps', 'fee-spot'],
+    followUpQuestions: ['邀请返佣怎么查看？', '我的邀请码在哪里找？'],
+  },
+  {
+    id: 'register-close',
+    intent: 'register',
+    title: '账户注销须知',
+    content: '账户注销须满足：①余额为零（已提取所有资产）；②无未完成订单；③无未完成合规审核。申请路径：账户设置 → 账户安全 → 注销账户。注销后30日内可撤销申请，30日后账户数据永久删除，无法恢复。',
+    related: ['register-steps', 'compliance-aml'],
+    followUpQuestions: ['注销后可以用同一邮箱重新注册吗？', '有资产未提走还能注销吗？'],
   },
 
   // ── api ──────────────────────────────────────────────────────────────────────
@@ -162,16 +275,126 @@ export const FAQ_DOCS: KnowledgeDoc[] = [
     id: 'api-overview',
     intent: 'api',
     title: 'API接口说明',
-    content:
-      'bitV提供REST API和WebSocket API，支持行情查询、账户管理和自动化交易。API Key创建路径：账户设置 → API管理。权限分只读和交易两级。详细文档：docs.bitv.com。',
-    related: ['api-security'],
+    content: 'bitV提供REST API和WebSocket API，支持行情查询、账户管理和自动化交易。API Key创建路径：账户设置 → API管理。权限分只读和交易两级。详细文档：docs.bitv.com。',
+    related: ['api-security', 'api-rate-limit', 'api-websocket'],
+    followUpQuestions: ['API速率限制是多少？', 'WebSocket怎么订阅行情？', 'API Key泄露了怎么办？'],
   },
   {
     id: 'api-security',
     intent: 'api',
     title: 'API Key安全须知',
-    content:
-      'API Key务必妥善保管，切勿在聊天或公开场合分享。建议绑定IP白名单。如API Key泄露，立即在账户设置中删除该Key并重新创建，同时检查近期交易记录。',
-    related: ['api-overview', 'security-tips'],
+    content: 'API Key务必妥善保管，切勿在聊天或公开场合分享。建议绑定IP白名单。如API Key泄露，立即在账户设置中删除该Key并重新创建，同时检查近期交易记录是否有异常。',
+    related: ['api-overview', 'security-tips', 'security-unusual-login'],
+    followUpQuestions: ['如何设置IP白名单？', '删除API Key会影响正在运行的程序吗？'],
+  },
+  {
+    id: 'api-rate-limit',
+    intent: 'api',
+    title: 'API速率限制',
+    content: 'REST API默认限制：1200次/分钟（按接口类型细分）；WebSocket：每连接100条/秒消息推送。超出限制返回HTTP 429。建议使用批量接口减少请求频次，或申请做市商权限享受更高速率配额。详见docs.bitv.com/rate-limits。',
+    related: ['api-overview', 'api-websocket'],
+    followUpQuestions: ['怎么提高速率限制？', '429错误怎么处理？'],
+  },
+  {
+    id: 'api-websocket',
+    intent: 'api',
+    title: 'WebSocket API使用',
+    content: 'WebSocket API使用要点：①订阅格式：发送JSON格式subscribe消息；②断线重连：建议实现指数退避重连策略；③心跳检测：每30秒发送ping，服务端返回pong；④连接限制：每账户最多100个并发WebSocket连接。详细文档：docs.bitv.com/websocket。',
+    related: ['api-overview', 'api-rate-limit'],
+    followUpQuestions: ['WebSocket订阅哪些频道？', '断线重连示例代码在哪里？'],
+  },
+
+  // ── order ─────────────────────────────────────────────────────────────────────
+  {
+    id: 'order-pending',
+    intent: 'order',
+    title: '限价单未成交原因',
+    content: '限价单未成交可能原因：①市价未到达挂单价格；②账户可用余额不足（部分被其他挂单冻结）；③交易对流动性不足。查看未成交订单：交易界面 → 当前委托。若确认价格合理但长时间未成交，可考虑调整价格或改用市价单。',
+    related: ['order-cancel', 'order-partial', 'account-balance'],
+    followUpQuestions: ['怎么修改挂单价格？', '挂单会自动过期吗？'],
+  },
+  {
+    id: 'order-cancel',
+    intent: 'order',
+    title: '撤单操作与常见问题',
+    content: '撤单路径：交易界面 → 当前委托 → 选择订单 → 撤销。注意：①已完成/已成交订单无法撤销；②撤单后资金立即解冻返回账户；③网络拥堵时撤单可能有短暂延迟。如撤单按钮灰色无法点击，请刷新页面后重试。',
+    related: ['order-pending', 'order-history'],
+    followUpQuestions: ['能批量撤销所有挂单吗？', '部分成交的订单可以撤销剩余部分吗？'],
+  },
+  {
+    id: 'order-history',
+    intent: 'order',
+    title: '交易记录查询与导出',
+    content: '查询交易记录：账户 → 交易记录（支持按日期、币种、订单类型筛选）。历史记录默认显示3个月，完整历史可申请导出CSV：账户设置 → 导出记录。导出请求通常在24小时内发送至注册邮箱。',
+    related: ['order-cancel', 'compliance-tax'],
+    followUpQuestions: ['交易记录格式是什么？', '导出记录用于报税够用吗？'],
+  },
+  {
+    id: 'order-partial',
+    intent: 'order',
+    title: '部分成交处理',
+    content: '部分成交：当市场流动性不足时，大额订单可能被部分成交。已成交部分按实际价格结算，剩余部分继续挂单等待。如不希望部分成交，下单时可选择：FOK（全部成交或取消）或IOC（立即成交并取消剩余）模式。',
+    related: ['order-pending', 'order-cancel'],
+    followUpQuestions: ['FOK和IOC有什么区别？', '部分成交的手续费怎么算？'],
+  },
+
+  // ── account ───────────────────────────────────────────────────────────────────
+  {
+    id: 'account-frozen',
+    intent: 'account',
+    title: '账户被冻结原因及解冻',
+    content: '账户冻结常见原因：①安全审核（检测到异常登录或交易）；②KYC信息过期或需补充；③收到执法机构协查请求；④违反用户协议（如刷单行为）。解冻流程：提交官方工单，说明情况并配合提供所需材料。处理时间通常1–5个工作日。',
+    related: ['account-restricted', 'security-hacked', 'compliance-aml', 'kyc-materials'],
+    followUpQuestions: ['怎么提交工单？', '冻结期间资产安全吗？', '冻结原因怎么查看？'],
+  },
+  {
+    id: 'account-restricted',
+    intent: 'account',
+    title: '账户功能受限原因',
+    content: '功能限制常见类型：①提币限制（KYC未完成或安全审核中）；②交易限制（风控临时措施）；③入金限制（需补充资金来源证明）。如发现功能受限，请登录后查看账户中心"通知"栏，通常会显示限制原因及解除方式。',
+    related: ['account-frozen', 'kyc-materials', 'compliance-aml'],
+    followUpQuestions: ['限制解除大概需要多久？', '能加急处理吗？'],
+  },
+  {
+    id: 'account-vip',
+    intent: 'account',
+    title: 'VIP等级查询与升级',
+    content: 'VIP等级基于过去30日现货+合约交易量，每日00:00 UTC自动更新。VIP0（默认）→ VIP1（≥10万USDT）→ VIP2（≥100万USDT）→ VIP3（≥1000万USDT）。可在账户页面查看当前等级、本月交易量及距下一级的差距。高VIP享受更低费率、更高提币额度和专属客服。',
+    related: ['fee-vip-tiers', 'account-balance', 'fee-btv-discount'],
+    followUpQuestions: ['VIP等级降级会怎样？', 'VIP费率和BTV折扣能叠加吗？'],
+  },
+  {
+    id: 'account-balance',
+    intent: 'account',
+    title: '可用余额与冻结余额说明',
+    content: '余额说明：①可用余额：可用于交易或提币的资金；②冻结余额：未成交挂单占用的保证金，撤单后立即释放；③合约保证金：占用于合约持仓，平仓后释放。如总资产与预期不符，请检查是否有未撤销的挂单或合约持仓占用了保证金。',
+    related: ['account-vip', 'order-pending', 'futures-margin'],
+    followUpQuestions: ['冻结余额什么时候解冻？', '合约账户余额怎么转到现货账户？'],
+  },
+
+  // ── compliance ────────────────────────────────────────────────────────────────
+  {
+    id: 'compliance-tax',
+    intent: 'compliance',
+    title: '税务报表与交易记录导出',
+    content: 'bitV提供年度交易记录导出（CSV格式），路径：账户设置 → 导出记录 → 选择年度。美国用户：平台将按IRS要求发送Form 1099-DA（自2025税年起生效），包含数字资产销售总收益数据。其他地区用户请根据当地税法自行申报，建议咨询专业税务顾问。',
+    related: ['order-history', 'account-balance', 'compliance-aml'],
+    followUpQuestions: ['导出记录支持哪些年份？', '1099-DA什么时候发送？'],
+  },
+  {
+    id: 'compliance-aml',
+    intent: 'compliance',
+    title: '反洗钱（AML）审查说明',
+    content: 'bitV遵循FATF合规要求，对可疑交易进行监控。若账户触发AML审查，可能需要提供：资金来源证明、交易目的说明、相关转账凭证。配合审查可加快账户恢复。bitV有义务向监管机构报告可疑交易，具体政策见用户协议。',
+    related: ['account-frozen', 'kyc-materials', 'compliance-sanctions'],
+    followUpQuestions: ['AML审查一般需要多久？', '什么情况会触发AML审查？'],
+  },
+  {
+    id: 'compliance-sanctions',
+    intent: 'compliance',
+    title: '受制裁地区限制',
+    content: 'bitV不向OFAC制裁名单中的国家/地区/个人提供服务，包括但不限于：朝鲜、伊朗、叙利亚、克里米亚地区。如您位于受制裁地区，相关功能将无法使用。如认为被错误限制，请通过官方渠道提交申诉，附上位置证明。',
+    related: ['account-frozen', 'kyc-benefits', 'compliance-aml'],
+    followUpQuestions: ['怎么证明我不在制裁地区？', '申诉需要提交什么材料？'],
   },
 ]

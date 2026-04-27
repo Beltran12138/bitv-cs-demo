@@ -59,6 +59,22 @@ describe('classifyIntent', () => {
   test('trading bot → api', () => expect(classifyIntent('set up a trading bot')).toBe('api'))
   test('quant → api', () => expect(classifyIntent('量化交易接口')).toBe('api'))
 
+  // order
+  test('订单 → order', () => expect(classifyIntent('我的订单为什么未成交')).toBe('order'))
+  test('撤单 → order', () => expect(classifyIntent('怎么撤单')).toBe('order'))
+  test('cancel order → order', () => expect(classifyIntent('how do I cancel order')).toBe('order'))
+  test('trade history → order', () => expect(classifyIntent('where is my trade history')).toBe('order'))
+
+  // account
+  test('账户冻结 → account', () => expect(classifyIntent('账户冻结了怎么办')).toBe('account'))
+  test('vip等级 → account', () => expect(classifyIntent('我的vip等级怎么查')).toBe('account'))
+  test('frozen → account', () => expect(classifyIntent('my account is frozen')).toBe('account'))
+
+  // compliance
+  test('税务 → compliance', () => expect(classifyIntent('需要缴税吗')).toBe('compliance'))
+  test('反洗钱 → compliance', () => expect(classifyIntent('反洗钱审查怎么配合')).toBe('compliance'))
+  test('1099 → compliance', () => expect(classifyIntent('do I need to file 1099')).toBe('compliance'))
+
   // unknown
   test('random text → unknown', () => expect(classifyIntent('what is the weather today')).toBe('unknown'))
   test('empty-ish text → unknown', () => expect(classifyIntent('hello')).toBe('unknown'))

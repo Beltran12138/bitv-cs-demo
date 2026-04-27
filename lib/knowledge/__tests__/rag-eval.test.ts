@@ -58,6 +58,21 @@ const GOLDEN_CASES: GoldenCase[] = [
     expectedIntent: 'api',
     mustContain: ['只读', 'API Key'],
   },
+  {
+    query: '我的订单一直未成交是怎么回事',
+    expectedIntent: 'order',
+    mustContain: ['委托', 'FOK'],
+  },
+  {
+    query: '账户冻结了怎么解冻',
+    expectedIntent: 'account',
+    mustContain: ['工单', '工作日'],
+  },
+  {
+    query: '平台会报税吗，需要交1099表吗',
+    expectedIntent: 'compliance',
+    mustContain: ['1099-DA', 'CSV'],
+  },
 ]
 
 describe('RAG golden eval — intent + knowledge retrieval', () => {

@@ -12,6 +12,9 @@ export type Intent =
   | 'futures'
   | 'register'
   | 'api'
+  | 'order'       // order status / cancel / history
+  | 'account'     // account freeze / VIP / balance
+  | 'compliance'  // tax / AML / sanctions
   | 'human'    // explicit escalation request
   | 'safety'   // off-platform solicitation detected
   | 'no_reply' // message doesn't warrant a response
@@ -43,14 +46,17 @@ const NO_REPLY_RE = /^[\s\p{Emoji_Presentation}\p{Emoji_Modifier}\p{Emoji_Compon
 
 // Intent → keyword map (mirrors BOT_RULES, drives future LLM routing)
 const INTENT_KEYWORDS: Record<Exclude<Intent, 'human' | 'safety' | 'no_reply' | 'unknown'>, string[]> = {
-  fee:      ['手续费', '费用', '费率', '手續費', '費率', 'fee', 'fees', 'commission', 'charge'],
-  withdraw: ['提币', '提款', '出金', '提幣', 'withdraw', 'withdrawal'],
-  kyc:      ['kyc', '实名', '认证', '身份验证', '認證', '身份驗證', 'verify', 'verification', 'identity'],
-  deposit:  ['充值', '入金', '存款', '充幣', 'deposit', 'fund', 'top up', 'topup'],
-  security: ['安全', '账户安全', '密码', '被盗', '安全性', '帳戶安全', '密碼', 'security', 'password', 'hacked', '2fa', '两步', '兩步'],
-  futures:  ['合约', '期货', '永续', '杠杆', '合約', '期貨', '永續', '槓桿', 'futures', 'perpetual', 'leverage', 'contract'],
-  register: ['注册', '开户', '注冊', '開戶', 'register', 'sign up', 'signup', 'create account'],
-  api:      ['api', 'api key', 'api接口', '量化', 'quant', 'trading bot'],
+  fee:        ['手续费', '费用', '费率', '手續費', '費率', 'fee', 'fees', 'commission', 'charge'],
+  withdraw:   ['提币', '提款', '出金', '提幣', 'withdraw', 'withdrawal'],
+  kyc:        ['kyc', '实名', '认证', '身份验证', '認證', '身份驗證', 'verify', 'verification', 'identity'],
+  deposit:    ['充值', '入金', '存款', '充幣', 'deposit', 'fund', 'top up', 'topup'],
+  security:   ['安全', '账户安全', '密码', '被盗', '安全性', '帳戶安全', '密碼', 'security', 'password', 'hacked', '2fa', '两步', '兩步'],
+  futures:    ['合约', '期货', '永续', '杠杆', '合約', '期貨', '永續', '槓桿', 'futures', 'perpetual', 'leverage', 'contract'],
+  register:   ['注册', '开户', '注冊', '開戶', 'register', 'sign up', 'signup', 'create account'],
+  api:        ['api', 'api key', 'api接口', '量化', 'quant', 'trading bot'],
+  order:      ['订单', '挂单', '撤单', '委托', '未成交', '訂單', '掛單', '撤單', '委託', 'open order', 'cancel order', 'order history', 'trade history', 'partial fill'],
+  account:    ['账户冻结', '冻结', '限制', '余额', 'vip等级', 'vip', '帳戶凍結', '凍結', '餘額', 'frozen', 'restricted', 'account balance', 'vip tier'],
+  compliance: ['税务', '报税', '反洗钱', '合规', '制裁', '缴税', '纳税', '税務', '報稅', '反洗錢', '合規', '繳稅', 'tax', 'aml', '1099', 'sanctions', 'money laundering', 'compliance'],
 }
 
 export function classifyIntent(input: string): Intent {
