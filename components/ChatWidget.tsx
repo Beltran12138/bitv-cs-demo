@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { supabase, type Message, type Session } from '@/lib/supabase'
+import { getSupabase, type Message, type Session } from '@/lib/supabase'
 import { t, type Language } from '@/lib/i18n'
 import type { ProcessResult } from '@/lib/agents'
 
@@ -45,7 +45,7 @@ export default function ChatWidget() {
     if (session?.status === 'waiting') {
       waitingTimerRef.current = setTimeout(async () => {
         if (sessionRef.current?.status === 'waiting') {
-          await supabase.from('messages').insert({
+          await getSupabase().from('messages').insert({
             session_id: sessionRef.current.id,
             role: 'bot',
             content: t[language].waitingTimeout,
@@ -66,8 +66,9 @@ export default function ChatWidget() {
   useEffect(() => {
     if (!session) return
 
-    supabase
-      .from('messages')
+    const sb = getSupabase()
+
+    sb.from('messages')
       .select('*')
       .eq('session_id', session.id)
       .order('created_at', { ascending: false })
@@ -76,7 +77,7 @@ export default function ChatWidget() {
         if (data) setMessages((data as Message[]).reverse())
       })
 
-    const msgChannel = supabase
+    const msgChannel = sb
       .channel(`messages:${session.id}`)
       .on(
         'postgres_changes',
@@ -92,7 +93,7 @@ export default function ChatWidget() {
       )
       .subscribe()
 
-    const sessionChannel = supabase
+    const sessionChannel = sb
       .channel(`session:${session.id}`)
       .on(
         'postgres_changes',
@@ -109,8 +110,8 @@ export default function ChatWidget() {
       .subscribe()
 
     return () => {
-      supabase.removeChannel(msgChannel)
-      supabase.removeChannel(sessionChannel)
+      sb.removeChannel(msgChannel)
+      sb.removeChannel(sessionChannel)
     }
   }, [session?.id])
 
@@ -125,7 +126,7 @@ export default function ChatWidget() {
     setSession(newSession)
     sessionRef.current = newSession
 
-    await supabase.from('messages').insert({
+    await getSupabase().from('messages').insert({
       session_id: newSession.id,
       role: 'bot',
       content: t[language].greeting,
@@ -136,7 +137,7 @@ export default function ChatWidget() {
     if (!session) return
     setFollowUps([])
 
-    await supabase.from('messages').insert({
+    await getSupabase().from('messages').insert({
       session_id: session.id,
       role: 'user',
       content: text,
@@ -177,7 +178,7 @@ export default function ChatWidget() {
     if (result.reply) {
       noMatchCountRef.current = 0
       setFollowUps(result.followUpQuestions ?? [])
-      await supabase.from('messages').insert({
+      await getSupabase().from('messages').insert({
         session_id: session.id,
         role: 'bot',
         content: result.reply,
@@ -189,7 +190,7 @@ export default function ChatWidget() {
         noMatchCountRef.current = 0
         await triggerTransfer(t[language].autoTransfer)
       } else {
-        await supabase.from('messages').insert({
+        await getSupabase().from('messages').insert({
           session_id: session.id,
           role: 'bot',
           content: t[language].noMatchOnce,
@@ -210,13 +211,14 @@ export default function ChatWidget() {
     const currentSession = sessionRef.current
     setIsTransferring(true)
 
-    await supabase.from('messages').insert({
+    const sb = getSupabase()
+    await sb.from('messages').insert({
       session_id: currentSession.id,
       role: 'bot',
       content: message || t[language].transferring,
     })
 
-    await supabase
+    await sb
       .from('sessions')
       .update({ status: 'waiting' })
       .eq('id', currentSession.id)
@@ -225,7 +227,7 @@ export default function ChatWidget() {
   async function handleLanguageChange(lang: Language) {
     setLanguage(lang)
     if (session) {
-      await supabase.from('sessions').update({ language: lang }).eq('id', session.id)
+      await getSupabase().from('sessions').update({ language: lang }).eq('id', session.id)
     }
   }
 

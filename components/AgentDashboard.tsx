@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { supabase, type Message, type Session } from '@/lib/supabase'
+import { getSupabase, type Message, type Session } from '@/lib/supabase'
 import { t } from '@/lib/i18n'
 import MessageBubble from './MessageBubble'
 
@@ -64,7 +64,8 @@ export default function AgentDashboard() {
     loadSessions()
     loadStats()
 
-    const channel = supabase
+    const sb = getSupabase()
+    const channel = sb
       .channel('all-sessions')
       .on(
         'postgres_changes',
@@ -73,14 +74,15 @@ export default function AgentDashboard() {
       )
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    return () => { sb.removeChannel(channel) }
   }, [])
 
   useEffect(() => {
     if (!selectedId) return
     loadMessages(selectedId)
 
-    const channel = supabase
+    const sb = getSupabase()
+    const channel = sb
       .channel(`agent-messages:${selectedId}`)
       .on(
         'postgres_changes',
@@ -92,7 +94,7 @@ export default function AgentDashboard() {
       )
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    return () => { sb.removeChannel(channel) }
   }, [selectedId])
 
   useEffect(() => {
@@ -100,7 +102,7 @@ export default function AgentDashboard() {
   }, [messages])
 
   async function loadSessions() {
-    const { data } = await supabase
+    const { data } = await getSupabase()
       .from('sessions')
       .select('*')
       .in('status', ['waiting', 'human'])
@@ -110,7 +112,7 @@ export default function AgentDashboard() {
 
   async function loadStats() {
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-    const { data } = await supabase
+    const { data } = await getSupabase()
       .from('sessions')
       .select('status')
       .gte('created_at', since)
@@ -121,7 +123,7 @@ export default function AgentDashboard() {
   }
 
   async function loadMessages(sessionId: string) {
-    const { data } = await supabase
+    const { data } = await getSupabase()
       .from('messages')
       .select('*')
       .eq('session_id', sessionId)
@@ -133,8 +135,9 @@ export default function AgentDashboard() {
     const sess = sessions.find(s => s.id === sessionId)
     if (!sess) return
 
-    await supabase.from('sessions').update({ status: 'human' }).eq('id', sessionId)
-    await supabase.from('messages').insert({
+    const sb = getSupabase()
+    await sb.from('sessions').update({ status: 'human' }).eq('id', sessionId)
+    await sb.from('messages').insert({
       session_id: sessionId,
       role: 'agent',
       content: t[sess.language].agentJoined('小王'),
@@ -147,7 +150,7 @@ export default function AgentDashboard() {
     const text = reply.trim()
     setReply('')
 
-    await supabase.from('messages').insert({
+    await getSupabase().from('messages').insert({
       session_id: selectedId,
       role: 'agent',
       content: text,
