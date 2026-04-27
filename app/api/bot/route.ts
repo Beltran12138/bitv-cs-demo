@@ -5,6 +5,7 @@ import { classifyIntent, processMessage } from '@/lib/agents'
 import { SYSTEM_PROMPTS, type AgentPromptKey } from '@/lib/prompts'
 import { getKnowledgeContext, formatContext } from '@/lib/knowledge/search'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { getSupabase } from '@/lib/supabase'
 import type { Language } from '@/lib/i18n'
 
 // Lazy singleton — avoids module-level init during Next.js build phase
@@ -38,13 +39,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'rate limit exceeded' }, { status: 429 })
   }
 
-  const { message, language, history } = await req.json() as {
+  const { message, language, history, sessionId } = await req.json() as {
     message: string
     language: Language
     history: HistoryMessage[]
+    sessionId?: string
   }
 
   const intent = classifyIntent(message)
+
+  // Write intent to session row (non-blocking, non-critical)
+  if (sessionId) {
+    getSupabase().from('sessions').update({ intent }).eq('id', sessionId).then(() => {})
+  }
   const lf = getLangfuse()
 
   const trace = lf?.trace({
@@ -61,24 +68,33 @@ export async function POST(req: NextRequest) {
   if (intent === 'safety') {
     trace?.update({ output: SAFETY_REPLIES[language], metadata: { intent } })
     if (lf) await lf.flushAsync()
-    return NextResponse.json({ reply: SAFETY_REPLIES[language], intent, shouldTransfer: false, traceId: trace?.id })
+    return NextResponse.json({ reply: SAFETY_REPLIES[language], intent, shouldTransfer: false, traceId: trace?.id, followUpQuestions: [] })
   }
   if (intent === 'human') {
     trace?.update({ output: 'human-handoff', metadata: { intent } })
     if (lf) await lf.flushAsync()
-    return NextResponse.json({ reply: null, intent, shouldTransfer: true, traceId: trace?.id })
+    return NextResponse.json({ reply: null, intent, shouldTransfer: true, traceId: trace?.id, followUpQuestions: [] })
   }
 
   const apiKey = process.env.DEEPSEEK_API_KEY
   if (!apiKey) {
     const fallback = processMessage(message, language)
     if (lf) await lf.flushAsync()
-    return NextResponse.json(fallback)
+    return NextResponse.json({ ...fallback, followUpQuestions: [] })
   }
 
   try {
     const chunks = await getKnowledgeContext(message, intent)
     const contextBlock = formatContext(chunks)
+
+    // Collect up to 3 unique follow-up questions from retrieved chunks
+    const followUpSet = new Set<string>()
+    for (const chunk of chunks) {
+      for (const q of (chunk.followUpQuestions ?? [])) {
+        if (followUpSet.size < 3) followUpSet.add(q)
+      }
+    }
+    const followUpQuestions = [...followUpSet]
 
     const promptKey = (intent in SYSTEM_PROMPTS ? intent : 'default') as AgentPromptKey
 
@@ -121,10 +137,10 @@ export async function POST(req: NextRequest) {
     })
 
     if (lf) await lf.flushAsync()
-    return NextResponse.json({ reply, intent, shouldTransfer: false, traceId: trace?.id })
+    return NextResponse.json({ reply, intent, shouldTransfer: false, traceId: trace?.id, followUpQuestions })
   } catch {
     const fallback = processMessage(message, language)
     if (lf) await lf.flushAsync()
-    return NextResponse.json(fallback)
+    return NextResponse.json({ ...fallback, followUpQuestions: [] })
   }
 }

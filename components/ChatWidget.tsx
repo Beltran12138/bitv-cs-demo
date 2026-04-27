@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase, type Message, type Session } from '@/lib/supabase'
 import { t, type Language } from '@/lib/i18n'
 import type { ProcessResult } from '@/lib/agents'
+
+type BotResponse = ProcessResult & { followUpQuestions?: string[] }
 import MessageBubble from './MessageBubble'
 import LanguageSwitcher from './LanguageSwitcher'
 
@@ -23,6 +25,7 @@ export default function ChatWidget() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const waitingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [feedback, setFeedback] = useState<Record<string, 1 | -1 | 'sent'>>({})
+  const [followUps, setFollowUps] = useState<string[]>([])
   // Langfuse: traceId waiting to be bound to the next bot message from Realtime
   const pendingTraceIdRef = useRef<string | null>(null)
   // messageId → Langfuse traceId
@@ -129,10 +132,9 @@ export default function ChatWidget() {
     })
   }
 
-  async function handleSend() {
-    if (!input.trim() || !session) return
-    const text = input.trim()
-    setInput('')
+  async function dispatch(text: string) {
+    if (!session) return
+    setFollowUps([])
 
     await supabase.from('messages').insert({
       session_id: session.id,
@@ -143,7 +145,7 @@ export default function ChatWidget() {
     if (session.status === 'human') return
 
     setIsThinking(true)
-    let result: ProcessResult
+    let result: BotResponse
     try {
       const res = await fetch('/api/bot', {
         method: 'POST',
@@ -151,6 +153,7 @@ export default function ChatWidget() {
         body: JSON.stringify({
           message: text,
           language,
+          sessionId: session.id,
           history: messages.slice(-10).map(m => ({
             role: m.role === 'user' ? 'user' : 'assistant',
             content: m.content,
@@ -173,6 +176,7 @@ export default function ChatWidget() {
 
     if (result.reply) {
       noMatchCountRef.current = 0
+      setFollowUps(result.followUpQuestions ?? [])
       await supabase.from('messages').insert({
         session_id: session.id,
         role: 'bot',
@@ -192,6 +196,13 @@ export default function ChatWidget() {
         })
       }
     }
+  }
+
+  async function handleSend() {
+    if (!input.trim() || !session) return
+    const text = input.trim()
+    setInput('')
+    await dispatch(text)
   }
 
   async function triggerTransfer(message?: string) {
@@ -317,6 +328,21 @@ export default function ChatWidget() {
             )}
             <div ref={bottomRef} />
           </div>
+
+          {/* Follow-up chips */}
+          {followUps.length > 0 && session?.status === 'bot' && !isThinking && (
+            <div className="px-3 pt-2 pb-1 flex flex-wrap gap-1.5 flex-shrink-0 border-t border-slate-800">
+              {followUps.map((q, i) => (
+                <button
+                  key={i}
+                  onClick={() => dispatch(q)}
+                  className="text-xs bg-slate-800 hover:bg-blue-900/40 border border-slate-600 hover:border-blue-500 text-slate-300 hover:text-blue-300 px-2.5 py-1 rounded-full transition-colors"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Input area */}
           <div className="border-t border-slate-700 p-3 flex-shrink-0">

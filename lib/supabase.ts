@@ -23,6 +23,7 @@ export type Session = {
   id: string
   status: 'bot' | 'waiting' | 'human'
   language: 'zh-CN' | 'zh-TW' | 'en'
+  intent?: string
   created_at: string
 }
 
