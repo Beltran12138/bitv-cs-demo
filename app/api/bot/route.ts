@@ -47,6 +47,8 @@ export async function POST(req: NextRequest) {
   }
 
   const intent = classifyIntent(message)
+  const HIGH_ANXIETY = new Set(['kyc', 'withdraw', 'security', 'account'])
+  const isHighAnxiety = HIGH_ANXIETY.has(intent)
 
   // Write intent to session row (non-blocking, non-critical)
   if (sessionId) {
@@ -63,24 +65,24 @@ export async function POST(req: NextRequest) {
   if (intent === 'no_reply') {
     trace?.update({ output: null, metadata: { intent } })
     if (lf) await lf.flushAsync()
-    return NextResponse.json({ reply: null, intent, shouldTransfer: false })
+    return NextResponse.json({ reply: null, intent, shouldTransfer: false, isHighAnxiety: false })
   }
   if (intent === 'safety') {
     trace?.update({ output: SAFETY_REPLIES[language], metadata: { intent } })
     if (lf) await lf.flushAsync()
-    return NextResponse.json({ reply: SAFETY_REPLIES[language], intent, shouldTransfer: false, traceId: trace?.id, followUpQuestions: [] })
+    return NextResponse.json({ reply: SAFETY_REPLIES[language], intent, shouldTransfer: false, traceId: trace?.id, followUpQuestions: [], isHighAnxiety: false })
   }
   if (intent === 'human') {
     trace?.update({ output: 'human-handoff', metadata: { intent } })
     if (lf) await lf.flushAsync()
-    return NextResponse.json({ reply: null, intent, shouldTransfer: true, traceId: trace?.id, followUpQuestions: [] })
+    return NextResponse.json({ reply: null, intent, shouldTransfer: true, traceId: trace?.id, followUpQuestions: [], isHighAnxiety: false })
   }
 
   const apiKey = process.env.DEEPSEEK_API_KEY
   if (!apiKey) {
     const fallback = processMessage(message, language)
     if (lf) await lf.flushAsync()
-    return NextResponse.json({ ...fallback, followUpQuestions: [] })
+    return NextResponse.json({ ...fallback, followUpQuestions: [], isHighAnxiety })
   }
 
   try {
@@ -141,10 +143,10 @@ export async function POST(req: NextRequest) {
     })
 
     if (lf) await lf.flushAsync()
-    return NextResponse.json({ reply, intent, shouldTransfer: false, traceId: trace?.id, followUpQuestions })
+    return NextResponse.json({ reply, intent, shouldTransfer: false, traceId: trace?.id, followUpQuestions, isHighAnxiety })
   } catch {
     const fallback = processMessage(message, language)
     if (lf) await lf.flushAsync()
-    return NextResponse.json({ ...fallback, followUpQuestions: [] })
+    return NextResponse.json({ ...fallback, followUpQuestions: [], isHighAnxiety })
   }
 }

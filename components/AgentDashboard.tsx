@@ -39,6 +39,11 @@ export default function AgentDashboard() {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
   const [analyticsLoading, setAnalyticsLoading] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const [suggestion, setSuggestion] = useState<string | null>(null)
+  const [loadingSuggestion, setLoadingSuggestion] = useState(false)
+  const [kbQuery, setKbQuery] = useState('')
+  const [kbResults, setKbResults] = useState<{ title: string; content: string }[]>([])
+  const [kbSearchLoading, setKbSearchLoading] = useState(false)
 
   const selected = sessions.find(s => s.id === selectedId) || null
   const lang = selected?.language ?? 'zh-CN'
@@ -76,6 +81,12 @@ export default function AgentDashboard() {
 
     return () => { sb.removeChannel(channel) }
   }, [])
+
+  useEffect(() => {
+    setSuggestion(null)
+    setKbQuery('')
+    setKbResults([])
+  }, [selectedId])
 
   useEffect(() => {
     if (!selectedId) return
@@ -157,6 +168,44 @@ export default function AgentDashboard() {
     })
   }
 
+  async function fetchSuggestion() {
+    if (!selectedId || !selected) return
+    setLoadingSuggestion(true)
+    setSuggestion(null)
+    try {
+      const res = await fetch('/api/assist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: messages.slice(-8).map(m => ({ role: m.role, content: m.content })),
+          intent: selected.intent,
+          language: selected.language,
+        }),
+      })
+      const data = await res.json()
+      setSuggestion(data.suggestion)
+    } finally {
+      setLoadingSuggestion(false)
+    }
+  }
+
+  async function searchKb() {
+    if (!kbQuery.trim()) return
+    setKbSearchLoading(true)
+    setKbResults([])
+    try {
+      const res = await fetch('/api/kb-search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: kbQuery, intent: selected?.intent }),
+      })
+      const data = await res.json()
+      setKbResults(data.results ?? [])
+    } finally {
+      setKbSearchLoading(false)
+    }
+  }
+
   const resolutionRate = stats.total > 0
     ? Math.round((stats.botResolved / stats.total) * 100)
     : 0
@@ -215,6 +264,15 @@ export default function AgentDashboard() {
           <span className="text-xs text-slate-400">实时</span>
         </div>
       </div>
+
+      {/* Pitch banner */}
+      {activeTab === 'sessions' && (
+        <div className="border-b border-white/5 px-5 py-2 bg-gradient-to-r from-blue-950/40 to-transparent flex-shrink-0">
+          <p className="text-[11px] text-blue-400/60 italic">
+            AI 解决 79%，人工专注高焦虑场景 — CS 是增长引擎，不是票务系统
+          </p>
+        </div>
+      )}
 
       {/* Analytics tab */}
       {activeTab === 'analytics' && (
@@ -424,6 +482,100 @@ export default function AgentDashboard() {
             </div>
           )}
         </div>
+
+        {/* Context panel: handoff summary + agent assist + KB search */}
+        {selected && (
+          <div className="w-56 border-l border-slate-800 flex flex-col overflow-hidden flex-shrink-0">
+
+            {/* Handoff summary */}
+            <div className="px-3 py-3 border-b border-slate-800 flex-shrink-0">
+              <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">交接摘要</div>
+              {selected.intent && (
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <span className="text-[10px] text-slate-400">意图</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded text-white ${INTENT_COLORS[selected.intent] ?? 'bg-slate-700'}`}>
+                    {selected.intent}
+                  </span>
+                </div>
+              )}
+              <div className="text-[10px] text-slate-400 mb-1.5">
+                Bot 回复 {messages.filter(m => m.role === 'bot').length} 次
+              </div>
+              {messages.filter(m => m.role === 'user').slice(-1)[0] && (
+                <div>
+                  <div className="text-[10px] text-slate-600 mb-0.5">用户最后发送</div>
+                  <div className="text-[10px] text-slate-300 leading-relaxed line-clamp-3">
+                    {messages.filter(m => m.role === 'user').slice(-1)[0].content}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Agent Assist */}
+            {selected.status === 'human' && (
+              <div className="px-3 py-3 border-b border-slate-800 flex-shrink-0">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-[10px] text-slate-500 uppercase tracking-wider">AI 建议</div>
+                  <button
+                    onClick={fetchSuggestion}
+                    disabled={loadingSuggestion}
+                    className="text-[10px] bg-blue-900/60 hover:bg-blue-800/60 text-blue-300 px-2 py-0.5 rounded transition-colors disabled:opacity-40"
+                  >
+                    {loadingSuggestion ? '生成中...' : '获取建议'}
+                  </button>
+                </div>
+                {suggestion && (
+                  <div className="bg-blue-950/40 border border-blue-800/30 rounded-lg p-2">
+                    <div className="text-[11px] text-slate-300 mb-2 leading-relaxed">{suggestion}</div>
+                    <button
+                      onClick={() => { setReply(suggestion); setSuggestion(null) }}
+                      className="text-[10px] bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-0.5 rounded transition-colors"
+                    >
+                      采纳
+                    </button>
+                  </div>
+                )}
+                {!suggestion && !loadingSuggestion && (
+                  <div className="text-[10px] text-slate-600">点击获取 AI 建议回复</div>
+                )}
+              </div>
+            )}
+
+            {/* KB Search */}
+            <div className="px-3 py-3 flex-1 overflow-y-auto">
+              <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">知识库搜索</div>
+              <div className="flex gap-1 mb-2">
+                <input
+                  type="text"
+                  value={kbQuery}
+                  onChange={e => setKbQuery(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && searchKb()}
+                  placeholder="搜索FAQ..."
+                  className="flex-1 bg-slate-800 text-white text-[11px] rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-blue-500 placeholder-slate-600 min-w-0"
+                />
+                <button
+                  onClick={searchKb}
+                  disabled={!kbQuery.trim() || kbSearchLoading}
+                  className="text-[10px] bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-1.5 rounded transition-colors disabled:opacity-40 flex-shrink-0"
+                >
+                  查
+                </button>
+              </div>
+              {kbSearchLoading && (
+                <div className="text-[10px] text-slate-600 text-center py-2">搜索中...</div>
+              )}
+              {kbResults.map((r, i) => (
+                <div key={i} className="mb-2 bg-slate-800/50 border border-slate-700/50 rounded-lg p-2">
+                  <div className="text-[10px] font-medium text-blue-400 mb-1">{r.title}</div>
+                  <div className="text-[10px] text-slate-400 leading-relaxed line-clamp-4">{r.content}</div>
+                </div>
+              ))}
+              {kbResults.length === 0 && !kbSearchLoading && kbQuery && (
+                <div className="text-[10px] text-slate-600 text-center py-2">无结果</div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

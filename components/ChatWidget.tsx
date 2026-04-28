@@ -5,7 +5,7 @@ import { getSupabase, type Message, type Session } from '@/lib/supabase'
 import { t, type Language } from '@/lib/i18n'
 import type { ProcessResult } from '@/lib/agents'
 
-type BotResponse = ProcessResult & { followUpQuestions?: string[] }
+type BotResponse = ProcessResult & { followUpQuestions?: string[]; isHighAnxiety?: boolean }
 import MessageBubble from './MessageBubble'
 import LanguageSwitcher from './LanguageSwitcher'
 
@@ -26,10 +26,13 @@ export default function ChatWidget() {
   const waitingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [feedback, setFeedback] = useState<Record<string, 1 | -1 | 'sent'>>({})
   const [followUps, setFollowUps] = useState<string[]>([])
-  // Langfuse: traceId waiting to be bound to the next bot message from Realtime
   const pendingTraceIdRef = useRef<string | null>(null)
-  // messageId → Langfuse traceId
   const traceIdMapRef = useRef<Record<string, string>>({})
+  const [isHighAnxiety, setIsHighAnxiety] = useState(false)
+  const [waitingElapsed, setWaitingElapsed] = useState(0)
+  const [showCsat, setShowCsat] = useState(false)
+  const [csatRating, setCsatRating] = useState(0)
+  const [csatSubmitted, setCsatSubmitted] = useState(false)
 
   useEffect(() => {
     if (isOpen && !session) {
@@ -40,6 +43,18 @@ export default function ChatWidget() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  useEffect(() => {
+    if (session?.status !== 'waiting') {
+      setWaitingElapsed(0)
+      return
+    }
+    const start = Date.now()
+    const timer = setInterval(() => {
+      setWaitingElapsed(Math.floor((Date.now() - start) / 1000))
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [session?.status])
 
   useEffect(() => {
     if (session?.status === 'waiting') {
@@ -136,6 +151,7 @@ export default function ChatWidget() {
   async function dispatch(text: string) {
     if (!session) return
     setFollowUps([])
+    setIsHighAnxiety(false)
 
     await getSupabase().from('messages').insert({
       session_id: session.id,
@@ -163,6 +179,7 @@ export default function ChatWidget() {
       })
       result = await res.json()
       if (result.traceId) pendingTraceIdRef.current = result.traceId
+      if (result.isHighAnxiety) setIsHighAnxiety(true)
     } finally {
       setIsThinking(false)
     }
@@ -210,6 +227,7 @@ export default function ChatWidget() {
     if (!sessionRef.current || sessionRef.current.status !== 'bot') return
     const currentSession = sessionRef.current
     setIsTransferring(true)
+    setIsHighAnxiety(false)
 
     const sb = getSupabase()
     await sb.from('messages').insert({
@@ -263,9 +281,54 @@ export default function ChatWidget() {
       {/* Chat window */}
       {isOpen && (
         <div
-          className="fixed bottom-24 right-6 w-80 sm:w-96 bg-slate-900 rounded-2xl shadow-2xl border border-slate-700 flex flex-col z-50 overflow-hidden"
+          className="fixed bottom-24 right-6 w-80 sm:w-96 bg-slate-900 rounded-2xl shadow-2xl border border-slate-700 flex flex-col z-50 overflow-hidden relative"
           style={{ height: '520px' }}
         >
+          {/* CSAT overlay */}
+          {showCsat && (
+            <div className="absolute inset-0 bg-slate-900/95 flex flex-col items-center justify-center z-10 rounded-2xl">
+              <div className="text-center px-6">
+                <div className="text-3xl mb-3">⭐</div>
+                <div className="text-sm font-medium text-slate-200 mb-5">{t[language].csatTitle}</div>
+                <div className="flex gap-3 justify-center mb-6">
+                  {[1, 2, 3, 4, 5].map(star => (
+                    <button
+                      key={star}
+                      onClick={() => setCsatRating(star)}
+                      className={`text-3xl transition-transform hover:scale-110 ${star <= csatRating ? 'text-yellow-400' : 'text-slate-600'}`}
+                    >
+                      ★
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-3 justify-center">
+                  <button
+                    onClick={() => setShowCsat(false)}
+                    className="text-xs text-slate-500 hover:text-slate-300 transition-colors px-3 py-1.5"
+                  >
+                    {t[language].csatSkip}
+                  </button>
+                  <button
+                    disabled={csatRating === 0}
+                    onClick={async () => {
+                      if (session && csatRating > 0) {
+                        await fetch('/api/feedback', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ messageId: `csat-${session.id}`, rating: csatRating, type: 'csat' }),
+                        })
+                      }
+                      setCsatSubmitted(true)
+                      setTimeout(() => { setShowCsat(false); setIsOpen(false) }, 1200)
+                    }}
+                    className="text-xs bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white px-4 py-1.5 rounded-lg transition-colors"
+                  >
+                    {csatSubmitted ? '感谢！' : t[language].csatSubmit}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           {/* Header */}
           <div className="bg-blue-700 px-4 py-3 flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-2">
@@ -323,13 +386,31 @@ export default function ChatWidget() {
                 <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
             )}
-            {isTransferring && session?.status === 'waiting' && (
-              <div className="text-center text-xs text-amber-400 py-2 animate-pulse">
-                ⏳ {t[language].waitingForAgent}...
+            {session?.status === 'waiting' && (
+              <div className="text-center text-xs text-amber-400 py-2">
+                <span className="animate-pulse">⏳</span> {t[language].waitingEstimate}
+                {waitingElapsed > 0 && (
+                  <span className="ml-1 text-slate-500">
+                    （{Math.floor(waitingElapsed / 60)}:{String(waitingElapsed % 60).padStart(2, '0')}）
+                  </span>
+                )}
               </div>
             )}
             <div ref={bottomRef} />
           </div>
+
+          {/* High-anxiety fast lane */}
+          {isHighAnxiety && session?.status === 'bot' && !isThinking && (
+            <div className="px-3 py-2 flex-shrink-0 bg-rose-950/40 border-t border-rose-900/30 flex items-center justify-between gap-2">
+              <span className="text-xs text-rose-300">{t[language].urgentTransfer}</span>
+              <button
+                onClick={() => triggerTransfer()}
+                className="text-xs bg-rose-600 hover:bg-rose-500 text-white px-3 py-1 rounded-full transition-colors whitespace-nowrap"
+              >
+                {t[language].urgentTransferBtn}
+              </button>
+            </div>
+          )}
 
           {/* Follow-up chips */}
           {followUps.length > 0 && session?.status === 'bot' && !isThinking && (
@@ -356,6 +437,14 @@ export default function ChatWidget() {
                 👤 {t[language].transferBtn}
               </button>
             )}
+            {session?.status === 'human' && (
+              <button
+                onClick={() => { setCsatRating(0); setCsatSubmitted(false); setShowCsat(true) }}
+                className="w-full mb-2 text-xs text-slate-500 border border-slate-800 rounded-lg py-1.5 hover:bg-slate-800/50 transition-colors"
+              >
+                {t[language].endChat}
+              </button>
+            )}
             <div className="flex gap-2">
               <input
                 type="text"
@@ -374,6 +463,11 @@ export default function ChatWidget() {
                 {t[language].send}
               </button>
             </div>
+            {session && (
+              <div className="text-center text-[10px] text-slate-700 mt-1.5">
+                {t[language].ticketId} #{session.id.slice(-6)}
+              </div>
+            )}
           </div>
         </div>
       )}
