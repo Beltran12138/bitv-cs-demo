@@ -280,55 +280,60 @@ export default function ChatWidget() {
 
       {/* Chat window */}
       {isOpen && (
-        <div
-          className="fixed bottom-24 right-6 w-80 sm:w-96 bg-slate-900 rounded-2xl shadow-2xl border border-slate-700 flex flex-col z-50 overflow-hidden relative"
-          style={{ height: '520px' }}
-        >
-          {/* CSAT overlay */}
-          {showCsat && (
-            <div className="absolute inset-0 bg-slate-900/95 flex flex-col items-center justify-center z-10 rounded-2xl">
-              <div className="text-center px-6">
-                <div className="text-3xl mb-3">⭐</div>
-                <div className="text-sm font-medium text-slate-200 mb-5">{t[language].csatTitle}</div>
-                <div className="flex gap-3 justify-center mb-6">
-                  {[1, 2, 3, 4, 5].map(star => (
-                    <button
-                      key={star}
-                      onClick={() => setCsatRating(star)}
-                      className={`text-3xl transition-transform hover:scale-110 ${star <= csatRating ? 'text-yellow-400' : 'text-slate-600'}`}
-                    >
-                      ★
-                    </button>
-                  ))}
-                </div>
-                <div className="flex gap-3 justify-center">
+        <>
+        {/* CSAT overlay — separate fixed element, same position/size as chat window */}
+        {showCsat && (
+          <div
+            className="fixed bottom-24 right-6 w-80 sm:w-96 bg-slate-900 border border-slate-700 rounded-2xl flex flex-col items-center justify-center z-[60]"
+            style={{ height: '520px' }}
+          >
+            <div className="text-center px-6">
+              <div className="text-3xl mb-3">⭐</div>
+              <div className="text-sm font-medium text-slate-200 mb-5">{t[language].csatTitle}</div>
+              <div className="flex gap-3 justify-center mb-6">
+                {[1, 2, 3, 4, 5].map(star => (
                   <button
-                    onClick={() => setShowCsat(false)}
-                    className="text-xs text-slate-500 hover:text-slate-300 transition-colors px-3 py-1.5"
+                    key={star}
+                    onClick={() => setCsatRating(star)}
+                    className={`text-3xl transition-transform hover:scale-110 ${star <= csatRating ? 'text-yellow-400' : 'text-slate-600'}`}
                   >
-                    {t[language].csatSkip}
+                    ★
                   </button>
-                  <button
-                    disabled={csatRating === 0}
-                    onClick={async () => {
-                      if (session && csatRating > 0) {
-                        await fetch('/api/feedback', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ messageId: `csat-${session.id}`, rating: csatRating, type: 'csat' }),
-                        })
-                      }
-                      setCsatSubmitted(true)
-                      setTimeout(() => { setShowCsat(false); setIsOpen(false) }, 1200)
-                    }}
-                    className="text-xs bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white px-4 py-1.5 rounded-lg transition-colors"
-                  >
-                    {csatSubmitted ? '感谢！' : t[language].csatSubmit}
-                  </button>
-                </div>
+                ))}
+              </div>
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={() => setShowCsat(false)}
+                  className="text-xs text-slate-500 hover:text-slate-300 transition-colors px-3 py-1.5"
+                >
+                  {t[language].csatSkip}
+                </button>
+                <button
+                  disabled={csatRating === 0}
+                  onClick={async () => {
+                    if (session && csatRating > 0) {
+                      await fetch('/api/feedback', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ messageId: `csat-${session.id}`, rating: csatRating, type: 'csat' }),
+                      })
+                    }
+                    setCsatSubmitted(true)
+                    setTimeout(() => { setShowCsat(false); setIsOpen(false) }, 1200)
+                  }}
+                  className="text-xs bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white px-4 py-1.5 rounded-lg transition-colors"
+                >
+                  {csatSubmitted ? '感谢！' : t[language].csatSubmit}
+                </button>
               </div>
             </div>
-          )}
+          </div>
+        )}
+
+        <div
+          className="fixed bottom-24 right-6 w-80 sm:w-96 bg-slate-900 rounded-2xl shadow-2xl border border-slate-700 flex flex-col z-50 overflow-hidden"
+          style={{ height: '520px' }}
+        >
           {/* Header */}
           <div className="bg-blue-700 px-4 py-3 flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-2">
@@ -470,6 +475,7 @@ export default function ChatWidget() {
             )}
           </div>
         </div>
+        </>
       )}
     </>
   )

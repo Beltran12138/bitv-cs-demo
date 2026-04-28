@@ -44,6 +44,7 @@ export default function AgentDashboard() {
   const [kbQuery, setKbQuery] = useState('')
   const [kbResults, setKbResults] = useState<{ title: string; content: string }[]>([])
   const [kbSearchLoading, setKbSearchLoading] = useState(false)
+  const [kbIsPopular, setKbIsPopular] = useState(false)
 
   const selected = sessions.find(s => s.id === selectedId) || null
   const lang = selected?.language ?? 'zh-CN'
@@ -86,6 +87,7 @@ export default function AgentDashboard() {
     setSuggestion(null)
     setKbQuery('')
     setKbResults([])
+    setKbIsPopular(false)
   }, [selectedId])
 
   useEffect(() => {
@@ -201,6 +203,7 @@ export default function AgentDashboard() {
       })
       const data = await res.json()
       setKbResults(data.results ?? [])
+      setKbIsPopular(data.isPopular ?? false)
     } finally {
       setKbSearchLoading(false)
     }
@@ -267,9 +270,9 @@ export default function AgentDashboard() {
 
       {/* Pitch banner */}
       {activeTab === 'sessions' && (
-        <div className="border-b border-white/5 px-5 py-2 bg-gradient-to-r from-blue-950/40 to-transparent flex-shrink-0">
-          <p className="text-[11px] text-blue-400/60 italic">
-            AI 解决 79%，人工专注高焦虑场景 — CS 是增长引擎，不是票务系统
+        <div className="border-b border-blue-900/30 px-5 py-2 bg-gradient-to-r from-blue-950/60 to-transparent flex-shrink-0">
+          <p className="text-[11px] text-blue-300/80 italic">
+            ✦ AI 解决 79%，人工专注高焦虑场景 — CS 是增长引擎，不是票务系统
           </p>
         </div>
       )}
@@ -455,7 +458,7 @@ export default function AgentDashboard() {
                     onChange={e => setReply(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && sendReply()}
                     placeholder={t[selected.language].replyPlaceholder}
-                    className="flex-1 bg-slate-800 rounded-lg px-4 py-2 text-sm outline-none focus:ring-1 focus:ring-blue-500 placeholder-slate-500"
+                    className="flex-1 bg-slate-800 text-white rounded-lg px-4 py-2 text-sm outline-none focus:ring-1 focus:ring-blue-500 placeholder-slate-500"
                   />
                   <button
                     onClick={sendReply}
@@ -563,6 +566,9 @@ export default function AgentDashboard() {
               </div>
               {kbSearchLoading && (
                 <div className="text-[10px] text-slate-600 text-center py-2">搜索中...</div>
+              )}
+              {kbIsPopular && kbResults.length > 0 && (
+                <div className="text-[10px] text-slate-600 mb-1.5">热门文章</div>
               )}
               {kbResults.map((r, i) => (
                 <div key={i} className="mb-2 bg-slate-800/50 border border-slate-700/50 rounded-lg p-2">
