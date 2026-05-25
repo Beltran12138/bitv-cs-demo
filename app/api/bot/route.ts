@@ -7,6 +7,9 @@ import { getKnowledgeContext, formatContext } from '@/lib/knowledge/search'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { getSupabase } from '@/lib/supabase'
 import type { Language } from '@/lib/i18n'
+import { sendMessage as larkSend } from '@/lib/lark/client'
+import { buildHandoffCard } from '@/lib/lark/cards'
+import { createCustomerRecord, updateCustomerRecord, findRecordBySessionId } from '@/lib/lark/base'
 
 // Lazy singleton — avoids module-level init during Next.js build phase
 let _lf: Langfuse | null | undefined
@@ -75,6 +78,13 @@ export async function POST(req: NextRequest) {
   if (intent === 'human') {
     trace?.update({ output: 'human-handoff', metadata: { intent } })
     if (lf) await lf.flushAsync()
+
+    // Lark handoff: push card to CS group + create/update base record
+    if (sessionId && process.env.LARK_APP_ID && process.env.LARK_CS_CHAT_ID) {
+      try { await pushLarkHandoff(sessionId, message, language) }
+      catch (e) { console.error('[lark handoff] fail:', e) }
+    }
+
     return NextResponse.json({ reply: null, intent, shouldTransfer: true, traceId: trace?.id, followUpQuestions: [], isHighAnxiety: false })
   }
 
@@ -149,4 +159,82 @@ export async function POST(req: NextRequest) {
     if (lf) await lf.flushAsync()
     return NextResponse.json({ ...fallback, followUpQuestions: [], isHighAnxiety })
   }
+}
+
+// ─── Lark handoff helper ─────────────────────────────────────────────────────
+
+async function pushLarkHandoff(sessionId: string, message: string, language: Language): Promise<void> {
+  const supabase = getSupabase()
+  const chatId = process.env.LARK_CS_CHAT_ID!
+
+  // Use previous user message as context if "human" trigger word alone
+  const HUMAN_TRIGGERS = /^(人工|转人工|轉人工|客服|真人|human|agent|support|representative)$/i
+  let displayMessage = message
+  if (HUMAN_TRIGGERS.test(message.trim())) {
+    const { data: prev } = await supabase
+      .from('messages')
+      .select('content')
+      .eq('session_id', sessionId)
+      .eq('role', 'user')
+      .order('created_at', { ascending: false })
+      .limit(2)
+    // Skip the current "人工" itself, take previous
+    if (prev && prev.length >= 2) displayMessage = prev[1].content
+  }
+
+  // 1. find or detect previous intent
+  const { data: sess } = await supabase
+    .from('sessions')
+    .select('intent, lark_base_record_id, lark_thread_root_msg_id')
+    .eq('id', sessionId)
+    .maybeSingle()
+  const intent = sess?.intent ?? 'human'
+
+  // 2. push handoff card to CS group
+  const card = buildHandoffCard({ sessionId, userMessage: displayMessage, intent, language })
+  const sent = await larkSend({
+    receiveId: chatId,
+    receiveIdType: 'chat_id',
+    msgType: 'interactive',
+    content: card,
+  })
+
+  // 3. create or update base record
+  let recordId = sess?.lark_base_record_id ?? null
+  if (!recordId) {
+    const existing = await findRecordBySessionId(sessionId).catch(() => null)
+    if (existing) {
+      recordId = existing.record_id
+      await updateCustomerRecord(recordId, {
+        intent,
+        status: 'waiting',
+        last_msg_at: Date.now(),
+      }).catch(() => {})
+    } else {
+      const created = await createCustomerRecord({
+        session_id: sessionId,
+        user_anon: `用户-${sessionId.slice(0, 6)}`,
+        intent,
+        status: 'waiting',
+        start_at: Date.now(),
+        last_msg_at: Date.now(),
+        messages_count: 1,
+        notes: `首次转人工: ${displayMessage.slice(0, 100)}`,
+      }).catch((e) => { console.warn('[base] create:', e); return null })
+      recordId = created?.record_id ?? null
+    }
+  } else {
+    await updateCustomerRecord(recordId, {
+      intent,
+      status: 'waiting',
+      last_msg_at: Date.now(),
+    }).catch(() => {})
+  }
+
+  // 4. persist lark fields on session
+  await supabase.from('sessions').update({
+    status: 'waiting',
+    lark_thread_root_msg_id: sent.message_id,
+    lark_base_record_id: recordId,
+  }).eq('id', sessionId)
 }

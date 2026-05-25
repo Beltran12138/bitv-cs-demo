@@ -6,11 +6,20 @@ create extension if not exists vector;          -- pgvector for RAG embeddings
 create table if not exists sessions (
   id         uuid        primary key default uuid_generate_v4(),
   status     text        not null default 'bot',
-  -- status: 'bot' | 'waiting' | 'human'
+  -- status: 'bot' | 'waiting' | 'human' | 'closed'
   language   text        not null default 'zh-CN',
   -- language: 'zh-CN' | 'zh-TW' | 'en'
+  intent     text,
+  -- Lark integration (v7): cs handoff bridge
+  lark_thread_root_msg_id text,  -- root message id of cs group card (for thread @reply backup)
+  lark_base_record_id     text,  -- record_id in BitV CS Demo customer profile base
   created_at timestamptz default now()
 );
+
+-- Migration for existing DBs:
+-- alter table sessions add column if not exists lark_thread_root_msg_id text;
+-- alter table sessions add column if not exists lark_base_record_id text;
+-- alter table sessions add column if not exists intent text;
 
 -- ── messages ──────────────────────────────────────────────────────────────────
 create table if not exists messages (

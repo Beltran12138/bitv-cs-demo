@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "test": "jest",
-    "eval": "tsx scripts/ragas-eval.ts"
+    "eval": "tsx scripts/ragas-eval.ts",
+    "lark:smoke": "tsx scripts/lark-smoke.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.103.3",
@@ -23,6 +24,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.4.2",
     "jest": "^29.7.0",
     "jest-cli": "^29.7.0",
     "jest-util": "^29.7.0",
