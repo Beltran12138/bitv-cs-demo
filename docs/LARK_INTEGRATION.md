@@ -127,11 +127,57 @@ npm run lark:smoke
 ```
 lib/lark/
   client.ts       # tenant_access_token + send/reply message
-  cards.ts        # 4 种卡片 builder
+  cards.ts        # 4 种卡片 builder（全 schema 2.0）
   base.ts         # base record CRUD
   verify.ts       # 事件订阅签名 + 解密
-app/api/lark/event/route.ts  # webhook
+app/api/lark/event/route.ts  # webhook（含 send_reply fire-and-forget 优化）
 app/api/bot/route.ts          # pushLarkHandoff() 在 intent=human 时调用
 scripts/lark-smoke.ts         # smoke test
+scripts/lark-resolve-wiki.ts  # wiki node → base app_token + table_id 解析
 supabase/migrations/20260525_lark_integration.sql
 ```
+
+---
+
+## 集成踩坑五大（2026-05-25 实战）
+
+下次做飞书集成必读，避免 4-6 小时排错。
+
+### 坑 1: Vercel CLI `--no-sensitive` flag 必加
+
+`vercel env add NAME production --value <v> --yes` 看似成功（返 "Added"），但 production runtime 读到空字符串。原因：sensitive 模式默认开，`--value` 被忽略。**修法**：必加 `--no-sensitive`。
+
+### 坑 2: 「事件订阅」≠「卡片回调」是两个独立 tab
+
+飞书后台「开发配置 → 事件与回调」下有两 tab：**事件订阅**（业务事件）和 **回调配置**（卡片专用）。卡片按钮交互必须配后者，且订阅 `card.action.trigger`，否则报 `200340`。**改后必须创建应用版本 + 发布**生效。
+
+### 坑 3: `input` 必须 schema 2.0 + form 容器
+
+schema 1.0 不支持 input。schema 2.0 input 必须包在 `tag: 'form'` 容器内（不能裸放 body.elements）。卡片顶层必须 `"schema": "2.0"`。否则报 `200673`。
+
+### 坑 4: form 内所有交互组件必须 `name`
+
+form 容器内的 button 也需 `name`（不止 input）。`name` 在卡片内唯一。**取消按钮等非提交按钮挪出 form**。否则报 `200530`。
+
+### 坑 5: webhook 3 秒超时
+
+飞书要求卡片回调 3 秒内响应。webhook 内 await 多个外部 API（supabase + 飞书）易超时。**修法**：仅 await 渲染必需的，其余（lark-base 更新、sessions.status 改写）改 fire-and-forget：
+
+```typescript
+// CRITICAL: await
+const { error } = await sb().from('messages').insert({...})
+
+// NON-CRITICAL: fire-and-forget
+sb().from('sessions').update({status: 'human'}).eq('id', sid).then(() => {})
+updateCustomerRecord(rid, {...}).catch(e => console.warn(e))
+
+return cardUpdate(newCard)
+```
+
+### 附加坑
+
+- **schema 1.0 ↔ 2.0 不可互升**：首推卡片是 1.0，所有更新卡必须 1.0；反之 2.0 始终 2.0。建议从一开始就全 2.0。报 `200830` 即此问题
+- **wiki node ≠ base app_token**：用户贴的 base URL 常为 wiki 链接（`/wiki/At3xxx`），不是直接 base URL（`/base/bascxxx?table=tblyyy`）。需先 `GET /open-apis/wiki/v2/spaces/get_node?token=<wiki>` 拿 obj_token。脚本：`scripts/lark-resolve-wiki.ts`
+- **海外 Lark vs 国内飞书 host 不同**：`open.larksuite.com`（海外） vs `open.feishu.cn`（国内）。代码用 env `LARK_DOMAIN` 切换
+- **base 字段读出是 segments 数组**：飞书 base API 返文本字段为 `[{text, type}]`，需 flatten 才能用为 string
+- **vercel CLI on PowerShell stdin 失效**：`echo "v" | vercel env add` 报 `git_branch_required`。必须 `--value` flag（且 `--no-sensitive`）

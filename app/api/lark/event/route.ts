@@ -160,17 +160,17 @@ async function handleCardAction(ev: CardActionEvent): Promise<NextResponse> {
         return NextResponse.json({ toast: { type: 'error', content: '回复内容不能为空' } })
       }
 
-      // INSERT message role=agent → Supabase Realtime pushes to ChatWidget
+      // CRITICAL: INSERT message (await — needed for Realtime push to ChatWidget)
       const { error } = await sb()
         .from('messages')
         .insert({ session_id: value.sessionId, role: 'agent', content: replyText })
       if (error) throw new Error(`messages insert: ${error.message}`)
 
-      // update sessions.status -> human + update base
-      await sb().from('sessions').update({ status: 'human' }).eq('id', value.sessionId)
-      const agentName = await resolveOperatorName(operator.open_id)
+      // Non-critical: fire-and-forget to stay under 3s feishu callback timeout
+      const agentName = `客服-${operator.open_id.slice(-6)}`
+      sb().from('sessions').update({ status: 'human' }).eq('id', value.sessionId).then(() => {})
       if (session?.lark_base_record_id) {
-        await updateCustomerRecord(session.lark_base_record_id, {
+        updateCustomerRecord(session.lark_base_record_id, {
           status: 'human',
           agent_user: agentName,
           last_msg_at: Date.now(),
@@ -189,10 +189,10 @@ async function handleCardAction(ev: CardActionEvent): Promise<NextResponse> {
     }
 
     case 'accept': {
-      const agentName = await resolveOperatorName(operator.open_id)
-      await sb().from('sessions').update({ status: 'human' }).eq('id', value.sessionId)
+      const agentName = `客服-${operator.open_id.slice(-6)}`
+      sb().from('sessions').update({ status: 'human' }).eq('id', value.sessionId).then(() => {})
       if (session?.lark_base_record_id) {
-        await updateCustomerRecord(session.lark_base_record_id, {
+        updateCustomerRecord(session.lark_base_record_id, {
           status: 'human',
           agent_user: agentName,
         }).catch((e) => console.warn('[base] update fail:', e))
@@ -232,10 +232,10 @@ async function handleCardAction(ev: CardActionEvent): Promise<NextResponse> {
     }
 
     case 'close': {
-      const agentName = await resolveOperatorName(operator.open_id)
-      await sb().from('sessions').update({ status: 'closed' }).eq('id', value.sessionId)
+      const agentName = `客服-${operator.open_id.slice(-6)}`
+      sb().from('sessions').update({ status: 'closed' }).eq('id', value.sessionId).then(() => {})
       if (session?.lark_base_record_id) {
-        await updateCustomerRecord(session.lark_base_record_id, {
+        updateCustomerRecord(session.lark_base_record_id, {
           status: 'closed',
           agent_user: agentName,
           last_msg_at: Date.now(),

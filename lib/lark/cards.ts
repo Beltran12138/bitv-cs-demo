@@ -1,5 +1,5 @@
-// Lark interactive card builders for CS handoff flow
-// Card schema docs: https://open.feishu.cn/document/common-capabilities/message-card
+// Lark interactive card builders for CS handoff flow (all schema 2.0)
+// Card schema docs: https://open.feishu.cn/document/feishu-cards/card-json-v2-structure
 
 const INTENT_LABEL: Record<string, string> = {
   fee: '💰 手续费', withdraw: '💸 提币', kyc: '🪪 KYC', deposit: '⬇️ 充值',
@@ -15,78 +15,71 @@ const STATUS_LABEL: Record<string, string> = {
   closed: '🔒 已关单',
 }
 
+type BtnValue = Record<string, unknown>
+
+function btn(opts: {
+  id: string
+  text: string
+  type?: 'primary' | 'default' | 'danger'
+  value: BtnValue
+  formSubmit?: boolean
+  name?: string
+}): object {
+  const b: Record<string, unknown> = {
+    tag: 'button',
+    element_id: opts.id,
+    text: { tag: 'plain_text', content: opts.text },
+    type: opts.type ?? 'default',
+    behaviors: [{ type: 'callback', value: opts.value }],
+  }
+  if (opts.formSubmit) {
+    b.form_action_type = 'submit'
+    b.name = opts.name ?? opts.id
+  }
+  return b
+}
+
 export type HandoffCardInput = {
   sessionId: string
   userMessage: string
   intent: string
   language: 'zh-CN' | 'zh-TW' | 'en'
-  baseUrl?: string  // 用户 chat URL，方便客服查上下文
+  baseUrl?: string
 }
 
 export function buildHandoffCard(input: HandoffCardInput): object {
   const intentLabel = INTENT_LABEL[input.intent] ?? input.intent
   const shortSid = input.sessionId.slice(0, 8)
+  const v = { sessionId: input.sessionId }
 
   return {
-    config: { wide_screen_mode: true, update_multi: true },
+    schema: '2.0',
+    config: { update_multi: true },
     header: {
       title: { tag: 'plain_text', content: `🎫 客户工单 #${shortSid}` },
       template: 'blue',
     },
-    elements: [
-      {
-        tag: 'div',
-        fields: [
-          { is_short: true, text: { tag: 'lark_md', content: `**会话**\n${shortSid}` } },
-          { is_short: true, text: { tag: 'lark_md', content: `**意图**\n${intentLabel}` } },
-          { is_short: true, text: { tag: 'lark_md', content: `**语言**\n${input.language}` } },
-          { is_short: true, text: { tag: 'lark_md', content: `**状态**\n${STATUS_LABEL.waiting}` } },
-        ],
-      },
-      { tag: 'hr' },
-      {
-        tag: 'div',
-        text: { tag: 'lark_md', content: `**📨 用户消息**\n> ${escapeMd(input.userMessage)}` },
-      },
-      { tag: 'hr' },
-      {
-        tag: 'action',
-        actions: [
-          {
-            tag: 'button',
-            text: { tag: 'plain_text', content: '📤 回复' },
-            type: 'primary',
-            value: { action: 'open_reply', sessionId: input.sessionId },
-          },
-          {
-            tag: 'button',
-            text: { tag: 'plain_text', content: '✋ 接单' },
-            type: 'default',
-            value: { action: 'accept', sessionId: input.sessionId },
-          },
-          {
-            tag: 'button',
-            text: { tag: 'plain_text', content: '📋 查档' },
-            type: 'default',
-            value: { action: 'lookup', sessionId: input.sessionId },
-          },
-          {
-            tag: 'button',
-            text: { tag: 'plain_text', content: '🔒 关单' },
-            type: 'danger',
-            value: { action: 'close', sessionId: input.sessionId },
-          },
-        ],
-      },
-      ...(input.baseUrl ? [{
-        tag: 'note',
-        elements: [{ tag: 'plain_text', content: `用户会话链接: ${input.baseUrl}` }],
-      }] : []),
-    ],
+    body: {
+      elements: [
+        {
+          tag: 'markdown',
+          content: `**会话**: \`${shortSid}\` · **意图**: ${intentLabel} · **语言**: ${input.language} · **状态**: ${STATUS_LABEL.waiting}`,
+        },
+        { tag: 'hr' },
+        {
+          tag: 'markdown',
+          content: `**📨 用户消息**\n> ${escapeMd(input.userMessage)}`,
+        },
+        { tag: 'hr' },
+        btn({ id: 'open_reply', text: '📤 回复', type: 'primary', value: { ...v, action: 'open_reply' } }),
+        btn({ id: 'accept', text: '✋ 接单', value: { ...v, action: 'accept' } }),
+        btn({ id: 'lookup', text: '📋 查档', value: { ...v, action: 'lookup' } }),
+        btn({ id: 'close', text: '🔒 关单', type: 'danger', value: { ...v, action: 'close' } }),
+      ],
+    },
   }
 }
 
-// 「回复」按钮点击后展开 input form
 export type ReplyFormCardInput = {
   sessionId: string
   userMessage: string
@@ -96,51 +89,50 @@ export type ReplyFormCardInput = {
 export function buildReplyFormCard(input: ReplyFormCardInput): object {
   const intentLabel = INTENT_LABEL[input.intent] ?? input.intent
   const shortSid = input.sessionId.slice(0, 8)
+  const v = { sessionId: input.sessionId, userMessage: input.userMessage, intent: input.intent }
 
   return {
-    config: { wide_screen_mode: true, update_multi: true },
+    schema: '2.0',
+    config: { update_multi: true },
     header: {
       title: { tag: 'plain_text', content: `📤 回复客户 #${shortSid}` },
       template: 'green',
     },
-    elements: [
-      {
-        tag: 'div',
-        text: { tag: 'lark_md', content: `**意图**: ${intentLabel} · **用户消息**:\n> ${escapeMd(input.userMessage)}` },
-      },
-      { tag: 'hr' },
-      {
-        tag: 'div',
-        text: { tag: 'lark_md', content: '**✏️ 输入回复内容**' },
-      },
-      {
-        tag: 'input',
-        name: 'reply_text',
-        placeholder: { tag: 'plain_text', content: '在此输入对客户的回复...' },
-        max_length: 1000,
-      },
-      {
-        tag: 'action',
-        actions: [
-          {
-            tag: 'button',
-            text: { tag: 'plain_text', content: '✅ 发送回复' },
-            type: 'primary',
-            value: { action: 'send_reply', sessionId: input.sessionId, userMessage: input.userMessage, intent: input.intent },
-          },
-          {
-            tag: 'button',
-            text: { tag: 'plain_text', content: '↩️ 取消' },
-            type: 'default',
-            value: { action: 'cancel_reply', sessionId: input.sessionId, userMessage: input.userMessage, intent: input.intent },
-          },
-        ],
-      },
-    ],
+    body: {
+      elements: [
+        {
+          tag: 'markdown',
+          content: `**意图**: ${intentLabel}\n\n**用户消息**:\n> ${escapeMd(input.userMessage)}`,
+        },
+        { tag: 'hr' },
+        {
+          tag: 'form',
+          name: 'reply_form',
+          elements: [
+            {
+              tag: 'input',
+              element_id: 'reply_input',
+              name: 'reply_text',
+              placeholder: { tag: 'plain_text', content: '在此输入对客户的回复...' },
+              max_length: 1000,
+              input_type: 'multiline_text',
+              rows: 3,
+              required: true,
+              label: { tag: 'plain_text', content: '✏️ 回复内容' },
+              label_position: 'top',
+            },
+            btn({
+              id: 'send_btn', text: '✅ 发送回复', type: 'primary',
+              value: { ...v, action: 'send_reply' }, formSubmit: true, name: 'send_btn',
+            }),
+          ],
+        },
+        btn({ id: 'cancel_btn', text: '↩️ 取消', value: { ...v, action: 'cancel_reply' } }),
+      ],
+    },
   }
 }
 
-// 状态更新卡片（接单/关单/已回复后展示）
 export type StatusCardInput = {
   sessionId: string
   userMessage: string
@@ -153,6 +145,7 @@ export type StatusCardInput = {
 export function buildStatusCard(input: StatusCardInput): object {
   const intentLabel = INTENT_LABEL[input.intent] ?? input.intent
   const shortSid = input.sessionId.slice(0, 8)
+  const v = { sessionId: input.sessionId }
 
   let statusText = ''
   let template = 'blue'
@@ -173,71 +166,47 @@ export function buildStatusCard(input: StatusCardInput): object {
 
   const elements: object[] = [
     {
-      tag: 'div',
-      fields: [
-        { is_short: true, text: { tag: 'lark_md', content: `**会话**\n${shortSid}` } },
-        { is_short: true, text: { tag: 'lark_md', content: `**意图**\n${intentLabel}` } },
-      ],
+      tag: 'markdown',
+      content: `**会话**: \`${shortSid}\` · **意图**: ${intentLabel}`,
     },
     { tag: 'hr' },
     {
-      tag: 'div',
-      text: { tag: 'lark_md', content: `**📨 用户消息**\n> ${escapeMd(input.userMessage)}` },
+      tag: 'markdown',
+      content: `**📨 用户消息**\n> ${escapeMd(input.userMessage)}`,
     },
   ]
 
   if (input.lastReply) {
     elements.push({ tag: 'hr' })
     elements.push({
-      tag: 'div',
-      text: { tag: 'lark_md', content: `**📤 客服回复**\n${escapeMd(input.lastReply)}` },
+      tag: 'markdown',
+      content: `**📤 客服回复**\n${escapeMd(input.lastReply)}`,
     })
   }
 
   elements.push({ tag: 'hr' })
   elements.push({
-    tag: 'div',
-    text: { tag: 'lark_md', content: `**🔄 状态**: ${statusText}` },
+    tag: 'markdown',
+    content: `**🔄 状态**: ${statusText}`,
   })
 
-  // 已回复状态后允许再次回复或关单
   if (input.status === 'replied' || input.status === 'human') {
-    elements.push({
-      tag: 'action',
-      actions: [
-        {
-          tag: 'button',
-          text: { tag: 'plain_text', content: '📤 再次回复' },
-          type: 'primary',
-          value: { action: 'open_reply', sessionId: input.sessionId },
-        },
-        {
-          tag: 'button',
-          text: { tag: 'plain_text', content: '📋 查档' },
-          type: 'default',
-          value: { action: 'lookup', sessionId: input.sessionId },
-        },
-        {
-          tag: 'button',
-          text: { tag: 'plain_text', content: '🔒 关单' },
-          type: 'danger',
-          value: { action: 'close', sessionId: input.sessionId },
-        },
-      ],
-    })
+    elements.push(btn({ id: 'open_reply2', text: '📤 再次回复', type: 'primary', value: { ...v, action: 'open_reply' } }))
+    elements.push(btn({ id: 'lookup2', text: '📋 查档', value: { ...v, action: 'lookup' } }))
+    elements.push(btn({ id: 'close2', text: '🔒 关单', type: 'danger', value: { ...v, action: 'close' } }))
   }
 
   return {
-    config: { wide_screen_mode: true, update_multi: true },
+    schema: '2.0',
+    config: { update_multi: true },
     header: {
       title: { tag: 'plain_text', content: `🎫 客户工单 #${shortSid}` },
       template,
     },
-    elements,
+    body: { elements },
   }
 }
 
-// 查档结果卡片
 export type LookupCardInput = {
   sessionId: string
   userMessage: string
@@ -257,45 +226,37 @@ export type LookupCardInput = {
 export function buildLookupCard(input: LookupCardInput): object {
   const shortSid = input.sessionId.slice(0, 8)
   const p = input.profile
+  const v = { sessionId: input.sessionId, userMessage: input.userMessage, intent: input.intent }
+
+  const lines = [
+    `**用户**: ${p.user_anon}`,
+    `**当前意图**: ${INTENT_LABEL[p.intent] ?? p.intent}`,
+    `**状态**: ${STATUS_LABEL[p.status] ?? p.status}`,
+    `**消息数**: ${p.messages_count}`,
+    `**开始**: ${p.start_at}`,
+    `**最近**: ${p.last_msg_at}`,
+  ]
+  if (p.agent_user) lines.push(`**接单客服**: ${p.agent_user}`)
+  if (p.notes) lines.push(`**备注**: ${p.notes}`)
 
   return {
-    config: { wide_screen_mode: true, update_multi: true },
+    schema: '2.0',
+    config: { update_multi: true },
     header: {
       title: { tag: 'plain_text', content: `📋 客户档案 #${shortSid}` },
       template: 'purple',
     },
-    elements: [
-      {
-        tag: 'div',
-        fields: [
-          { is_short: true, text: { tag: 'lark_md', content: `**用户**\n${p.user_anon}` } },
-          { is_short: true, text: { tag: 'lark_md', content: `**当前意图**\n${INTENT_LABEL[p.intent] ?? p.intent}` } },
-          { is_short: true, text: { tag: 'lark_md', content: `**状态**\n${STATUS_LABEL[p.status] ?? p.status}` } },
-          { is_short: true, text: { tag: 'lark_md', content: `**消息数**\n${p.messages_count}` } },
-          { is_short: true, text: { tag: 'lark_md', content: `**开始**\n${p.start_at}` } },
-          { is_short: true, text: { tag: 'lark_md', content: `**最近**\n${p.last_msg_at}` } },
-          ...(p.agent_user ? [{ is_short: false, text: { tag: 'lark_md', content: `**接单客服**: ${p.agent_user}` } }] : []),
-          ...(p.notes ? [{ is_short: false, text: { tag: 'lark_md', content: `**备注**: ${p.notes}` } }] : []),
-        ],
-      },
-      { tag: 'hr' },
-      {
-        tag: 'action',
-        actions: [
-          {
-            tag: 'button',
-            text: { tag: 'plain_text', content: '↩️ 返回工单' },
-            type: 'default',
-            value: { action: 'back_to_handoff', sessionId: input.sessionId, userMessage: input.userMessage, intent: input.intent },
-          },
-        ],
-      },
-    ],
+    body: {
+      elements: [
+        { tag: 'markdown', content: lines.join('\n') },
+        { tag: 'hr' },
+        btn({ id: 'back_to_handoff', text: '↩️ 返回工单', value: { ...v, action: 'back_to_handoff' } }),
+      ],
+    },
   }
 }
 
 function escapeMd(s: string): string {
-  // 限制长度避免卡片过长，escape lark_md 控制符
   const trimmed = s.length > 500 ? s.slice(0, 500) + '…' : s
   return trimmed.replace(/\\/g, '\\\\').replace(/\n/g, '\n> ')
 }

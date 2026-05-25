@@ -80,12 +80,20 @@ export async function POST(req: NextRequest) {
     if (lf) await lf.flushAsync()
 
     // Lark handoff: push card to CS group + create/update base record
-    if (sessionId && process.env.LARK_APP_ID && process.env.LARK_CS_CHAT_ID) {
+    let larkError: string | null = null
+    const larkConfigured = !!(process.env.LARK_APP_ID && process.env.LARK_CS_CHAT_ID)
+    if (sessionId && larkConfigured) {
       try { await pushLarkHandoff(sessionId, message, language) }
-      catch (e) { console.error('[lark handoff] fail:', e) }
+      catch (e) {
+        console.error('[lark handoff] fail:', e)
+        larkError = (e as Error).message ?? String(e)
+      }
     }
 
-    return NextResponse.json({ reply: null, intent, shouldTransfer: true, traceId: trace?.id, followUpQuestions: [], isHighAnxiety: false })
+    return NextResponse.json({
+      reply: null, intent, shouldTransfer: true, traceId: trace?.id, followUpQuestions: [], isHighAnxiety: false,
+      _lark_debug: { configured: larkConfigured, hasSessionId: !!sessionId, error: larkError },
+    })
   }
 
   const apiKey = process.env.DEEPSEEK_API_KEY
@@ -173,13 +181,19 @@ async function pushLarkHandoff(sessionId: string, message: string, language: Lan
   if (HUMAN_TRIGGERS.test(message.trim())) {
     const { data: prev } = await supabase
       .from('messages')
-      .select('content')
+      .select('content,role,created_at')
       .eq('session_id', sessionId)
       .eq('role', 'user')
       .order('created_at', { ascending: false })
-      .limit(2)
-    // Skip the current "人工" itself, take previous
-    if (prev && prev.length >= 2) displayMessage = prev[1].content
+      .limit(5)
+    // Find the first non-trigger-word user message
+    if (prev && prev.length > 0) {
+      const real = prev.find((m) => !HUMAN_TRIGGERS.test(m.content.trim()))
+      if (real) displayMessage = real.content
+      else displayMessage = '（客户主动请求转人工，无具体问题描述）'
+    } else {
+      displayMessage = '（客户主动请求转人工，无具体问题描述）'
+    }
   }
 
   // 1. find or detect previous intent
