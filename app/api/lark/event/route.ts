@@ -15,6 +15,7 @@ import {
   buildLookupCard,
 } from '@/lib/lark/cards'
 import { findRecordBySessionId, updateCustomerRecord } from '@/lib/lark/base'
+import { getCachedName, preWarmName } from '@/lib/lark/users'
 
 type CardActionEvent = {
   schema: '2.0'
@@ -167,7 +168,8 @@ async function handleCardAction(ev: CardActionEvent): Promise<NextResponse> {
       if (error) throw new Error(`messages insert: ${error.message}`)
 
       // Non-critical: fire-and-forget to stay under 3s feishu callback timeout
-      const agentName = `客服-${operator.open_id.slice(-6)}`
+      preWarmName(operator.open_id)
+      const agentName = getCachedName(operator.open_id)
       sb().from('sessions').update({ status: 'human' }).eq('id', value.sessionId).then(() => {})
       if (session?.lark_base_record_id) {
         updateCustomerRecord(session.lark_base_record_id, {
@@ -189,7 +191,8 @@ async function handleCardAction(ev: CardActionEvent): Promise<NextResponse> {
     }
 
     case 'accept': {
-      const agentName = `客服-${operator.open_id.slice(-6)}`
+      preWarmName(operator.open_id)
+      const agentName = getCachedName(operator.open_id)
       sb().from('sessions').update({ status: 'human' }).eq('id', value.sessionId).then(() => {})
       if (session?.lark_base_record_id) {
         updateCustomerRecord(session.lark_base_record_id, {
@@ -232,7 +235,8 @@ async function handleCardAction(ev: CardActionEvent): Promise<NextResponse> {
     }
 
     case 'close': {
-      const agentName = `客服-${operator.open_id.slice(-6)}`
+      preWarmName(operator.open_id)
+      const agentName = getCachedName(operator.open_id)
       sb().from('sessions').update({ status: 'closed' }).eq('id', value.sessionId).then(() => {})
       if (session?.lark_base_record_id) {
         updateCustomerRecord(session.lark_base_record_id, {
@@ -287,7 +291,8 @@ async function handleImReceive(ev: ImReceiveEvent): Promise<NextResponse> {
   await sb().from('messages').insert({ session_id: session.id, role: 'agent', content: text })
   await sb().from('sessions').update({ status: 'human' }).eq('id', session.id)
   if (session.lark_base_record_id) {
-    const agentName = await resolveOperatorName(ev.event.sender.sender_id.open_id)
+    preWarmName(ev.event.sender.sender_id.open_id)
+    const agentName = getCachedName(ev.event.sender.sender_id.open_id)
     await updateCustomerRecord(session.lark_base_record_id, {
       status: 'human',
       agent_user: agentName,
@@ -322,11 +327,6 @@ async function fetchLastUserMessage(sessionId: string): Promise<string | null> {
     .limit(1)
     .maybeSingle()
   return data?.content ?? null
-}
-
-async function resolveOperatorName(openId: string): Promise<string> {
-  // demo: just truncate open_id; real impl could call /open-apis/contact/v3/users/:id
-  return `客服-${openId.slice(-6)}`
 }
 
 function formatTs(ts: unknown): string {
