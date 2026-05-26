@@ -167,10 +167,14 @@ async function handleCardAction(ev: CardActionEvent): Promise<NextResponse> {
         .insert({ session_id: value.sessionId, role: 'agent', content: replyText })
       if (error) throw new Error(`messages insert: ${error.message}`)
 
-      // Non-critical: fire-and-forget to stay under 3s feishu callback timeout
+      // CRITICAL: status MUST flip to 'human' for ChatWidget to enable input + hide waitingEstimate
+      // (fire-and-forget gets killed by Vercel serverless after response returns)
       preWarmName(operator.open_id)
       const agentName = getCachedName(operator.open_id)
-      sb().from('sessions').update({ status: 'human' }).eq('id', value.sessionId).then(() => {})
+      const { error: statusErr } = await sb().from('sessions').update({ status: 'human' }).eq('id', value.sessionId)
+      if (statusErr) console.warn('[sessions] status update fail:', statusErr)
+
+      // Non-critical: base update fire-and-forget OK (no user-facing impact)
       if (session?.lark_base_record_id) {
         updateCustomerRecord(session.lark_base_record_id, {
           status: 'human',
@@ -193,7 +197,9 @@ async function handleCardAction(ev: CardActionEvent): Promise<NextResponse> {
     case 'accept': {
       preWarmName(operator.open_id)
       const agentName = getCachedName(operator.open_id)
-      sb().from('sessions').update({ status: 'human' }).eq('id', value.sessionId).then(() => {})
+      // CRITICAL: await status flip (see send_reply note)
+      const { error: statusErr } = await sb().from('sessions').update({ status: 'human' }).eq('id', value.sessionId)
+      if (statusErr) console.warn('[sessions] status update fail:', statusErr)
       if (session?.lark_base_record_id) {
         updateCustomerRecord(session.lark_base_record_id, {
           status: 'human',
@@ -237,7 +243,9 @@ async function handleCardAction(ev: CardActionEvent): Promise<NextResponse> {
     case 'close': {
       preWarmName(operator.open_id)
       const agentName = getCachedName(operator.open_id)
-      sb().from('sessions').update({ status: 'closed' }).eq('id', value.sessionId).then(() => {})
+      // CRITICAL: await status flip so ChatWidget reflects closed state immediately
+      const { error: statusErr } = await sb().from('sessions').update({ status: 'closed' }).eq('id', value.sessionId)
+      if (statusErr) console.warn('[sessions] status update fail:', statusErr)
       if (session?.lark_base_record_id) {
         updateCustomerRecord(session.lark_base_record_id, {
           status: 'closed',

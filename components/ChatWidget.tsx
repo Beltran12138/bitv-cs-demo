@@ -159,7 +159,15 @@ export default function ChatWidget() {
       content: text,
     })
 
-    if (session.status === 'human') return
+    if (session.status === 'human') {
+      // Relay to Lark thread so agent sees follow-up messages
+      fetch('/api/user-relay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: session.id, message: text }),
+      }).catch((e) => console.warn('[user-relay] fail:', e))
+      return
+    }
 
     setIsThinking(true)
     let result: BotResponse
