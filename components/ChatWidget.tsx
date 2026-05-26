@@ -188,7 +188,8 @@ export default function ChatWidget() {
 
     if (result.shouldTransfer) {
       noMatchCountRef.current = 0
-      await triggerTransfer(t[language].autoTransfer)
+      // /api/bot already handled Lark push for intent=human; skip duplicate
+      await triggerTransferLocalOnly(t[language].autoTransfer)
       return
     }
 
@@ -205,7 +206,7 @@ export default function ChatWidget() {
 
       if (noMatchCountRef.current >= 3) {
         noMatchCountRef.current = 0
-        await triggerTransfer(t[language].autoTransfer)
+        await triggerTransfer(t[language].autoTransfer, 'auto_no_match')
       } else {
         await getSupabase().from('messages').insert({
           session_id: session.id,
@@ -223,7 +224,22 @@ export default function ChatWidget() {
     await dispatch(text)
   }
 
-  async function triggerTransfer(message?: string) {
+  // Local-only: just bumps UI status; used when /api/bot already pushed Lark (intent=human)
+  async function triggerTransferLocalOnly(message?: string) {
+    if (!sessionRef.current || sessionRef.current.status !== 'bot') return
+    const currentSession = sessionRef.current
+    setIsTransferring(true)
+    setIsHighAnxiety(false)
+    const sb = getSupabase()
+    await sb.from('messages').insert({
+      session_id: currentSession.id,
+      role: 'bot',
+      content: message || t[language].transferring,
+    })
+    await sb.from('sessions').update({ status: 'waiting' }).eq('id', currentSession.id)
+  }
+
+  async function triggerTransfer(message?: string, reason: 'manual_button' | 'auto_no_match' = 'manual_button') {
     if (!sessionRef.current || sessionRef.current.status !== 'bot') return
     const currentSession = sessionRef.current
     setIsTransferring(true)
@@ -240,6 +256,17 @@ export default function ChatWidget() {
       .from('sessions')
       .update({ status: 'waiting' })
       .eq('id', currentSession.id)
+
+    // Trigger backend Lark handoff (fire-and-forget — non-blocking UX)
+    fetch('/api/handoff', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: currentSession.id,
+        language,
+        reason,
+      }),
+    }).catch((e) => console.warn('[handoff] fail:', e))
   }
 
   async function handleLanguageChange(lang: Language) {
