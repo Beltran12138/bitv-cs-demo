@@ -1,4 +1,4 @@
-# BitV CS Demo · Lark 集成（v7）
+# Acme CS Demo · Lark 集成（v7）
 
 ## 架构
 
@@ -27,7 +27,7 @@
 ### 1. 建自建应用
 
 - https://open.feishu.cn → 开发者后台 → 创建企业自建应用
-- 名称：`BitV CS Demo`
+- 名称：`Acme CS Demo`
 - **权限管理 → 开通**：
   - `im:message:send_as_bot` — 以应用身份发消息
   - `im:message` — 接收消息
@@ -43,13 +43,13 @@
 
 ### 2. 客服群
 
-- 飞书 IM 创建群 `BitV CS Demo 客服群`
-- 把 `BitV CS Demo` 机器人加入群
+- 飞书 IM 创建群 `Acme CS Demo 客服群`
+- 把 `Acme CS Demo` 机器人加入群
 - 群设置 → 群信息 → 复制 `chat_id`（`oc_xxx`）
 
 ### 3. 多维表格客户档案
 
-- 飞书云文档新建多维表格 `BitV CS Demo 客户档案`
+- 飞书云文档新建多维表格 `Acme CS Demo 客户档案`
 - 字段：
 
 | 字段名 | 类型 |
@@ -97,7 +97,7 @@ npm run lark:smoke
 
 | 时间 | 动作 | 展示重点 |
 |---|---|---|
-| 0:00 | 打开 cs-demo-beta.vercel.app/chat | 客户视角 |
+| 0:00 | 本地 `npm run dev` 打开 /chat | 客户视角 |
 | 0:15 | 客户问「KYC 怎么这么慢？提交 3 天了」 | DeepSeek 自动答（流式）|
 | 0:45 | 客户问「人工」 | 触发 handoff |
 | 0:50 | 切到飞书客服群 | 弹一张卡片，含客户意图/消息/4 按钮 |

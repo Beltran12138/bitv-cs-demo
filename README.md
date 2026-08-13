@@ -1,216 +1,140 @@
-# bitV Customer Service AI System
+# assay
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org/)
-[![Supabase](https://img.shields.io/badge/Supabase-Realtime%20%2B%20pgvector-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com/)
-[![DeepSeek](https://img.shields.io/badge/AI-DeepSeek%20Chat-FF6B35)](https://platform.deepseek.com/)
-[![Vercel](https://img.shields.io/badge/Deployed-Vercel-black?logo=vercel)](https://cs-demo-beta.vercel.app/)
-[![CI](https://github.com/Beltran12138/bitv-cs-demo/actions/workflows/ci.yml/badge.svg)](https://github.com/Beltran12138/bitv-cs-demo/actions/workflows/ci.yml)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+**Check the judge before you trust the score.**
 
-A production-ready, multi-agent AI customer service chatbot built for a crypto exchange. Features real-time human handoff, intent-based specialist routing, RAG knowledge base with pgvector, live agent dashboard, and message feedback analytics.
+`assay` is an evaluation harness for knowledge-answering support agents. Its
+subject is not the agent — it is the *evaluator*. Before reporting a quality
+number, `assay` asks three questions about the number itself:
 
-**Live Demo:** [User Chat](https://cs-demo-beta.vercel.app/chat) · [Agent Dashboard](https://cs-demo-beta.vercel.app/agent)
+1. **Is the judge scoring its own work?** (self-preference)
+2. **Does the eval exercise the path that actually runs in production?** (mirror drift)
+3. **Are two different things being averaged into one score?** (construct conflation)
 
----
+Only after those pass does a score mean anything.
 
-## Features
-
-| Feature | Detail |
-|---------|--------|
-| **Multi-agent routing** | 8 specialist agents (KYC, withdrawal, fees, futures, security, deposits, registration, API) |
-| **RAG knowledge base** | pgvector semantic search over 20+ FAQ documents; graceful fallback to intent-based lookup |
-| **Real-time handoff** | Supabase Realtime bidirectional sync — sub-100ms message delivery |
-| **Safety filter** | Detects off-platform solicitation (Telegram/WeChat/OTC), returns fraud warning |
-| **Multilingual** | zh-CN / zh-TW / en with per-session language switching |
-| **Typing indicator** | Animated 3-dot thinking state during LLM inference |
-| **Waiting timeout** | 3-minute reminder if no agent joins after handoff request |
-| **Message feedback** | 👍/👎 rating on bot responses, persisted to PostgreSQL |
-| **Agent analytics** | Session counts, AI resolution rate, intent distribution in dashboard |
-| **Rate limiting** | 20 req/min per IP on `/api/bot` |
+> Status: **early, single-fixture.** One reference agent, one FAQ corpus, no
+> published results yet. Nothing here is production-tested. See
+> [Honest limitations](#honest-limitations).
 
 ---
 
-## Architecture
+## Why this exists
 
-```mermaid
-graph TB
-    User[User Browser] -->|chat message| CW[ChatWidget]
-    CW -->|POST /api/bot| BA[Bot API Route]
-    BA --> IC[Intent Classifier]
-    IC -->|human / 3× no-match| HH[Human Handoff]
-    IC -->|safety phrase| SF[Fraud Warning]
-    IC -->|no_reply emoji| NR[Silent]
-    IC -->|domain intent| RAG[RAG Retrieval]
-    RAG -->|with OPENAI_API_KEY| VEC[(knowledge_chunks\npgvector cosine search)]
-    RAG -->|fallback| KW[Intent-filtered FAQ lookup]
-    VEC --> CTX[Context Injection]
-    KW --> CTX
-    CTX --> DS[DeepSeek Chat API\n8 specialist system prompts]
-    DS --> BA
-    BA -->|INSERT message| MSG[(messages table\nPostgreSQL)]
-    MSG -->|Realtime push| CW
-    MSG -->|Realtime push| AD[Agent Dashboard]
-    AD -->|accept / reply| MSG
-    CW -->|POST /api/feedback| FB[(message_feedback)]
+The 2026 standard for customer-service agents is
+[τ²-bench](https://github.com/sierra-research/tau2-bench): it scores an agent by
+diffing the **final database state** against an annotated goal. No LLM judge is
+involved, so there is nothing to be biased.
+
+That design only covers tasks with a world state to diff — a return, a
+cancellation, a plan change. It does not cover the other half of a support
+queue: **knowledge questions**. "What's the withdrawal fee?" changes no
+database row. There is no state to compare, so in practice these are graded by
+an LLM judge — and the judge layer ships with no verification of its own.
+
+`assay` is that missing layer. τ²-bench is not a leaderboard to climb here; it
+is a **ruler**. Because its verdicts are deterministic, they can be used to
+measure how far an LLM judge drifts on the same trajectories.
+
+## The three checks
+
+### 1. Self-preference
+
+Using the same model to generate an answer and to grade it is widely reported to
+inflate the score — roughly 10–25% for same-model pairs, surviving even
+programmatically verifiable rubrics.
+
+**This repo's own measurement does not reproduce that as a rule.** Across a 3×3
+generator × judge matrix, one model shows +0.114, one shows **−0.373**, one is
+flat, and the mean residual is negative. The naive single-generator version of
+the same experiment returned +0.177 — the expected answer — and it was wrong,
+because "same family" was collinear with judge strictness. Both numbers, and
+why the first was discarded, are in [FINDINGS #5](FINDINGS.md).
+
+Which is the point: the effect is real enough to matter and unstable enough that
+you cannot assume its direction for *your* judge. So `assay` refuses to report a
+score without naming the generator and the judge, flags the pair when they share
+a model family, and does not tell you which way the bias runs — it makes you
+measure it.
+
+### 2. Mirror drift
+
+An eval that reimplements the retrieval logic it is testing will pass while
+production fails, because the copy and the original share the same bug. An eval
+that stubs out the production path tests something that never runs.
+
+`assay` calls the same entry point the application calls, and its assertions are
+anchored to independently sourced expectations rather than to a second copy of
+the implementation.
+
+### 3. Construct conflation
+
+**Faithfulness is not correctness.** Faithfulness asks "did the answer stay
+inside the retrieved context"; correctness asks "is the answer true". A system
+scoring 0.95 faithfulness on a stale or wrong context is faithfully repeating
+something false — and the metric reports that as success.
+
+`assay` keeps them as separate constructs and **never averages across
+constructs**. When the two disagree — high faithfulness, low correctness — that
+is not noise to be smoothed away; it is the single most informative signal in
+the report, and it points at the corpus, not the model.
+
+## Layout
+
+```
+lib/          reference support agent under test (Next.js + RAG)
+              intent routing → retrieval → generation → human handoff
+lib/knowledge/ fixture FAQ corpus for a fictional exchange ("Acme")
+scripts/      eval entry points
+supabase/     schema for the reference agent
 ```
 
----
+The chat application in this repo is not the product. It is the **fixture** —
+a real, non-trivial RAG support agent to point the harness at, so the checks
+are exercised against something that behaves like production rather than a toy.
 
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js 16 App Router, TypeScript, Tailwind CSS |
-| Realtime | Supabase Realtime (`postgres_changes`) |
-| Database | PostgreSQL via Supabase, pgvector extension |
-| AI Chat | DeepSeek Chat API (OpenAI-compatible SDK) |
-| RAG Embeddings | OpenAI `text-embedding-3-small` (optional, enables pgvector path) |
-| Deployment | Vercel |
-
----
-
-## Project Structure
-
-```
-├── app/
-│   ├── api/
-│   │   ├── bot/route.ts          # Intent classify → RAG context → DeepSeek
-│   │   ├── feedback/route.ts     # POST { messageId, rating }
-│   │   ├── seed/route.ts         # Admin: embed FAQ docs → pgvector
-│   │   └── session/route.ts      # POST → create session row
-│   ├── chat/page.tsx             # User-facing chat page
-│   └── agent/page.tsx            # Agent dashboard page
-├── components/
-│   ├── ChatWidget.tsx            # Chat UI + feedback buttons
-│   ├── AgentDashboard.tsx        # Realtime console + analytics header
-│   └── MessageBubble.tsx
-├── lib/
-│   ├── agents/
-│   │   ├── index.ts              # Intent classifier + processMessage fallback
-│   │   └── __tests__/index.test.ts
-│   ├── knowledge/
-│   │   ├── faq.ts                # 20+ FAQ documents (9 categories)
-│   │   └── search.ts             # RAG: vector search or intent-filter fallback
-│   ├── prompts/index.ts          # 8 specialist system prompts
-│   ├── rate-limit.ts             # In-memory IP rate limiter
-│   ├── supabase.ts               # Supabase client + types
-│   └── i18n.ts                   # Translations (zh-CN / zh-TW / en)
-└── supabase/schema.sql           # Full schema: sessions, messages, knowledge_chunks, feedback
-```
-
----
-
-## Performance Metrics
-
-- **Bot auto-resolution rate:** ~70% (intent matched + LLM reply generated)
-- **Average LLM response time:** 1–3 seconds (DeepSeek Chat)
-- **Human handoff trigger:** 3 consecutive unmatched queries OR explicit request
-- **Message delivery latency:** <100ms via Supabase Realtime
-- **Knowledge base:** 20 FAQ chunks across 9 specialist domains
-- **Rate limit:** 20 requests / minute / IP
-
----
-
-## Setup
+## Running it
 
 ```bash
-git clone <repo-url>
-cd bitv-cs-demo
 npm install
+npm test            # golden cases: intent routing + retrieval, no network
+npm run eval        # judge-scored eval of the reference agent
+npm run selfpref    # generator × judge matrix (see below)
 ```
 
-### Environment Variables
+`eval` needs `DEEPSEEK_API_KEY`. `selfpref` additionally needs
+`ASSAY_JUDGE_BASE_URL` and `ASSAY_JUDGE_API_KEY` for the cross-family judges.
 
-Copy `.env.example` to `.env.local`:
+`selfpref` runs every model as both writer and grader and reports the residual
+on the diagonal after subtracting each model's leniency and each model's
+quality. The naive version of this experiment — one generator, self judge vs
+cross judges — is not implemented on purpose: it confounds self-preference with
+judge strictness, and the confound is not small. See FINDINGS #5.
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon key |
-| `DEEPSEEK_API_KEY` | Yes | DeepSeek API key (chat + query rewrite) |
-| `OPENAI_API_KEY` | Optional | Enables full pgvector RAG path |
-| `SEED_SECRET` | Optional | Guards `POST /api/seed` against public access |
-| `LANGFUSE_PUBLIC_KEY` | Optional | Langfuse project public key — enables LLM tracing |
-| `LANGFUSE_SECRET_KEY` | Optional | Langfuse project secret key |
-| `LANGFUSE_HOST` | Optional | Langfuse host (default: `https://cloud.langfuse.com`) |
+Generated answers are frozen to `fixtures/answers/` and committed, so the
+grading half of the experiment is reproducible without re-running generation.
 
-### Database
+## Honest limitations
 
-Run `supabase/schema.sql` in your Supabase SQL Editor (includes pgvector extension, all tables, and the `match_knowledge` RPC function).
+- **The corpus is fiction.** The FAQ describes a made-up exchange. It is
+  internally consistent and adequate for exercising retrieval, but no claim in
+  it is a fact about any real venue.
+- **One fixture, one domain.** Everything is Chinese-language crypto exchange
+  support. Nothing here shows the checks generalize.
+- **No published measurement yet.** The self-preference number for this
+  pipeline has not been measured. Until it is, the claim above is borrowed from
+  the literature, not from this repo.
+- **The reference agent is a single model behind eight prompts.** It routes by
+  keyword to one of eight system prompts; there is no agent-to-agent handoff and
+  no planner. Calling that "multi-agent" would be a stretch, so this README
+  doesn't.
 
-### Seed Knowledge Base (optional, requires `OPENAI_API_KEY`)
+## References
 
-```bash
-curl -X POST http://localhost:3000/api/seed
-```
+- Yao et al., *τ-bench* / [tau2-bench](https://github.com/sierra-research/tau2-bench) — deterministic state-diff scoring for CS agents
+- [Self-Preference Bias in Rubric-Based Evaluation of LLMs](https://arxiv.org/abs/2604.06996) — bias persists under verifiable rubrics
+- [Agreement Measurement for Rubric-based LLM Judges](https://arxiv.org/abs/2606.00093) — why agreement numbers across differing rubrics aren't comparable
+- [AI Self-preferencing in Algorithmic Hiring](https://arxiv.org/abs/2509.00462) — self-preference measured against controlled quality
 
-This embeds all 20 FAQ documents and stores them in `knowledge_chunks` via pgvector.
+## License
 
-### Run
-
-```bash
-npm run dev
-# http://localhost:3000/chat   — user chat
-# http://localhost:3000/agent  — agent dashboard
-```
-
----
-
-## RAG Strategy
-
-The system uses a two-tier retrieval approach:
-
-**Demo / no embedding key:**
-Intent classifier routes to one of 9 categories → top-3 matching FAQ chunks are injected as context → DeepSeek generates a grounded reply.
-
-**Production (with `OPENAI_API_KEY`):**
-User query is first rewritten by DeepSeek into retrieval-optimised form → embedded with `text-embedding-3-small` → cosine similarity search over `knowledge_chunks` via pgvector → top-3 chunks injected as context → DeepSeek generates reply.
-
-Both paths inject context the same way — only the retrieval method changes.
-
----
-
-## LLMOps — Langfuse Tracing (optional)
-
-When `LANGFUSE_SECRET_KEY` is set, every DeepSeek generation is automatically traced:
-
-| What is captured | Where to see it |
-|-----------------|----------------|
-| Input messages (system prompt + history) | Langfuse → Traces |
-| Output reply | Langfuse → Traces |
-| Token usage (prompt + completion) | Langfuse → Model Cost |
-| Intent, promptKey, RAG chunk count | Langfuse → Metadata |
-| 👍/👎 user feedback score | Langfuse → Scores |
-
-**Setup:**
-1. Create a free project at [cloud.langfuse.com](https://cloud.langfuse.com)
-2. Copy the project's Public Key and Secret Key
-3. Add to `.env.local`:
-   ```
-   LANGFUSE_PUBLIC_KEY=pk-lf-...
-   LANGFUSE_SECRET_KEY=sk-lf-...
-   LANGFUSE_HOST=https://cloud.langfuse.com
-   ```
-4. Restart dev server — traces appear in Langfuse immediately
-
-Without these keys the system runs normally; all Langfuse calls are no-ops.
-
----
-
-## Testing
-
-```bash
-npm test
-# Runs intent classification unit tests (lib/agents/__tests__/index.test.ts)
-```
-
----
-
-## Key Design Decisions
-
-- **Server-side LLM calls only** — `DEEPSEEK_API_KEY` never exposed to client
-- **Fallback chain** — vector search → intent filter → keyword match → "no match" transfer
-- **Realtime deduplication** — message dedup by ID prevents double-display on resubscription
-- **RLS disabled** for demo; production requires row-level security policies
-- **In-memory rate limiter** — sufficient for demo; swap with Redis/Upstash for production
+MIT

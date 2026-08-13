@@ -6,7 +6,7 @@ export default function ChatPage() {
   return (
     <div className="min-h-screen bg-[#080c1a] relative overflow-hidden">
 
-      {/* Background — blue/purple glow matching bitV hero */}
+      {/* Background — blue/purple glow matching Acme hero */}
       <div className="absolute inset-0 bg-gradient-to-br from-[#080c1a] via-[#0c1430] to-[#080c1a] pointer-events-none" />
       <div className="absolute top-0 right-0 w-[700px] h-[700px] bg-blue-700/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute top-16 right-32 w-[450px] h-[450px] bg-purple-700/15 rounded-full blur-3xl pointer-events-none" />
@@ -19,7 +19,7 @@ export default function ChatPage() {
           <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg flex items-center justify-center shadow-lg shadow-blue-900/50">
             <span className="text-white font-black text-sm leading-none">V</span>
           </div>
-          <span className="text-white font-semibold text-[17px] tracking-tight">BitV</span>
+          <span className="text-white font-semibold text-[17px] tracking-tight">Acme</span>
         </div>
 
         {/* Nav links */}

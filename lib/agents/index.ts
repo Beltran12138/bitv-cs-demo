@@ -86,9 +86,9 @@ export function classifyIntent(input: string): Intent {
 // ─── Safety replies ──────────────────────────────────────────────────────────
 
 const SAFETY_REPLIES: Record<Language, string> = {
-  'zh-CN': '温馨提示：请通过 bitV 官方渠道沟通，切勿将账户信息或资金转至平台外，谨防诈骗。',
-  'zh-TW': '溫馨提示：請通過 bitV 官方渠道溝通，切勿將帳戶資訊或資金轉至平台外，謹防詐騙。',
-  'en': 'Notice: Please use official bitV channels only. Never share account details or send funds off-platform. Stay safe from scams.',
+  'zh-CN': '温馨提示：请通过 Acme 官方渠道沟通，切勿将账户信息或资金转至平台外，谨防诈骗。',
+  'zh-TW': '溫馨提示：請通過 Acme 官方渠道溝通，切勿將帳戶資訊或資金轉至平台外，謹防詐騙。',
+  'en': 'Notice: Please use official Acme channels only. Never share account details or send funds off-platform. Stay safe from scams.',
 }
 
 // ─── Main entry point ────────────────────────────────────────────────────────

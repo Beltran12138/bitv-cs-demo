@@ -12,7 +12,7 @@ create table if not exists sessions (
   intent     text,
   -- Lark integration (v7): cs handoff bridge
   lark_thread_root_msg_id text,  -- root message id of cs group card (for thread @reply backup)
-  lark_base_record_id     text,  -- record_id in BitV CS Demo customer profile base
+  lark_base_record_id     text,  -- record_id in Acme CS Demo customer profile base
   created_at timestamptz default now()
 );
 

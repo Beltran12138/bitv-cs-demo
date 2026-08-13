@@ -221,7 +221,7 @@ export default function AgentDashboard() {
         <div className="w-5 h-5 bg-gradient-to-br from-blue-500 to-blue-700 rounded flex items-center justify-center">
           <span className="text-white font-black text-[10px] leading-none">V</span>
         </div>
-        <span className="text-white font-semibold text-sm tracking-tight">BitV</span>
+        <span className="text-white font-semibold text-sm tracking-tight">Acme</span>
         <span className="text-slate-600 text-xs ml-1">客服工作台</span>
       </div>
 

@@ -9,9 +9,9 @@ export const BOT_RULES: BotRule[] = [
   {
     keywords: ['手续费', '费用', '费率', '手續費', '費率', 'fee', 'fees', 'commission', 'charge'],
     answers: {
-      'zh-CN': 'bitV 现货交易手续费为 0.1%，持有 BTV 可享最低 0.05% 优惠费率。提币手续费根据币种不同，具体请查看提币页面。',
-      'zh-TW': 'bitV 現貨交易手續費為 0.1%，持有 BTV 可享最低 0.05% 優惠費率。提幣手續費根據幣種不同，具體請查看提幣頁面。',
-      'en': 'bitV charges 0.1% for spot trading. BTV holders enjoy rates as low as 0.05%. Withdrawal fees vary by asset — check the withdrawal page for details.',
+      'zh-CN': 'Acme 现货交易手续费为 0.1%，持有 ACME 可享最低 0.05% 优惠费率。提币手续费根据币种不同，具体请查看提币页面。',
+      'zh-TW': 'Acme 現貨交易手續費為 0.1%，持有 ACME 可享最低 0.05% 優惠費率。提幣手續費根據幣種不同，具體請查看提幣頁面。',
+      'en': 'Acme charges 0.1% for spot trading. ACME holders enjoy rates as low as 0.05%. Withdrawal fees vary by asset — check the withdrawal page for details.',
     },
   },
   {
@@ -41,17 +41,17 @@ export const BOT_RULES: BotRule[] = [
   {
     keywords: ['安全', '账户安全', '密码', '被盗', '安全性', '帳戶安全', '密碼', 'security', 'password', 'hacked', '2fa', '两步', '兩步'],
     answers: {
-      'zh-CN': '建议开启双重验证（2FA）保护账户安全。如发现账户异常，立即修改密码并联系我们。bitV 采用冷热钱包分离存储，99% 资金存于冷钱包。',
-      'zh-TW': '建議開啟雙重驗證（2FA）保護帳戶安全。如發現帳戶異常，立即修改密碼並聯繫我們。bitV 採用冷熱錢包分離儲存，99% 資金存於冷錢包。',
-      'en': 'We recommend enabling 2FA. If you notice suspicious activity, change your password immediately and contact us. bitV uses cold storage for 99% of funds.',
+      'zh-CN': '建议开启双重验证（2FA）保护账户安全。如发现账户异常，立即修改密码并联系我们。Acme 采用冷热钱包分离存储，99% 资金存于冷钱包。',
+      'zh-TW': '建議開啟雙重驗證（2FA）保護帳戶安全。如發現帳戶異常，立即修改密碼並聯繫我們。Acme 採用冷熱錢包分離儲存，99% 資金存於冷錢包。',
+      'en': 'We recommend enabling 2FA. If you notice suspicious activity, change your password immediately and contact us. Acme uses cold storage for 99% of funds.',
     },
   },
   {
     keywords: ['合约', '期货', '永续', '杠杆', '合約', '期貨', '永續', '槓桿', 'futures', 'perpetual', 'leverage', 'contract'],
     answers: {
-      'zh-CN': 'bitV 提供永续合约，最高杠杆 100x。建议新用户从低杠杆开始并设置止损。合约手续费：Maker 0.02%，Taker 0.05%。',
-      'zh-TW': 'bitV 提供永續合約，最高槓桿 100x。建議新用戶從低槓桿開始並設定止損。合約手續費：Maker 0.02%，Taker 0.05%。',
-      'en': 'bitV offers perpetual futures with up to 100x leverage. New users should start low and always set stop-losses. Fees: Maker 0.02%, Taker 0.05%.',
+      'zh-CN': 'Acme 提供永续合约，最高杠杆 100x。建议新用户从低杠杆开始并设置止损。合约手续费：Maker 0.02%，Taker 0.05%。',
+      'zh-TW': 'Acme 提供永續合約，最高槓桿 100x。建議新用戶從低槓桿開始並設定止損。合約手續費：Maker 0.02%，Taker 0.05%。',
+      'en': 'Acme offers perpetual futures with up to 100x leverage. New users should start low and always set stop-losses. Fees: Maker 0.02%, Taker 0.05%.',
     },
   },
   {
@@ -65,9 +65,9 @@ export const BOT_RULES: BotRule[] = [
   {
     keywords: ['api', 'api key', 'api接口', '量化', 'quant', 'trading bot', 'bot'],
     answers: {
-      'zh-CN': 'bitV 提供 REST API 和 WebSocket API。在账户设置中创建 API Key，可设置只读或交易权限。详细文档请访问 docs.bitv.com。',
-      'zh-TW': 'bitV 提供 REST API 和 WebSocket API。在帳戶設定中建立 API Key，可設定唯讀或交易權限。詳細文件請訪問 docs.bitv.com。',
-      'en': 'bitV offers REST and WebSocket APIs. Create an API key in Account Settings with read-only or trading permissions. See docs.bitv.com for full documentation.',
+      'zh-CN': 'Acme 提供 REST API 和 WebSocket API。在账户设置中创建 API Key，可设置只读或交易权限。详细文档请访问 docs.acme.com。',
+      'zh-TW': 'Acme 提供 REST API 和 WebSocket API。在帳戶設定中建立 API Key，可設定唯讀或交易權限。詳細文件請訪問 docs.acme.com。',
+      'en': 'Acme offers REST and WebSocket APIs. Create an API key in Account Settings with read-only or trading permissions. See docs.acme.com for full documentation.',
     },
   },
 ]

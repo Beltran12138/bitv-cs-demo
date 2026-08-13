@@ -1,96 +1,69 @@
 import { classifyIntent } from '../../agents'
+import { getKnowledgeContext, formatContext } from '../search'
+import { GOLDEN_CASES, KNOWN_RETRIEVAL_GAPS } from '../../assay/golden'
 import { FAQ_DOCS } from '../faq'
 
-type GoldenCase = {
-  query: string
-  expectedIntent: string
-  mustContain: string[]
-}
+// This suite calls the same entry point the application calls
+// (`getKnowledgeContext`), rather than reimplementing retrieval. An earlier
+// version of this file copied the intent-filter logic inline; the copy passed
+// while the production path — query rewrite → embedding → pgvector — was never
+// exercised at all.
 
-const GOLDEN_CASES: GoldenCase[] = [
-  {
-    query: 'maker taker费率是多少',
-    expectedIntent: 'fee',
-    mustContain: ['0.1%', 'maker'],
-  },
-  {
-    query: '合约手续费怎么算',
-    expectedIntent: 'fee',
-    mustContain: ['0.02%', '0.05%'],
-  },
-  {
-    query: '怎么提币，步骤是什么',
-    expectedIntent: 'withdraw',
-    mustContain: ['资产', 'TxID'],
-  },
-  {
-    query: '提币要多久到账',
-    expectedIntent: 'withdraw',
-    mustContain: ['工作日', 'TxID'],
-  },
-  {
-    query: 'KYC认证需要什么材料',
-    expectedIntent: 'kyc',
-    mustContain: ['护照', '自拍照'],
-  },
-  {
-    query: '如何充值USDT入金',
-    expectedIntent: 'deposit',
-    mustContain: ['充值地址', '区块链'],
-  },
-  {
-    query: '如何开启2FA保护账户',
-    expectedIntent: 'security',
-    mustContain: ['2FA', 'Google Authenticator'],
-  },
-  {
-    query: '永续合约最高多少倍杠杆',
-    expectedIntent: 'futures',
-    mustContain: ['100x', '资金费率'],
-  },
-  {
-    query: '怎么注册bitV账号',
-    expectedIntent: 'register',
-    mustContain: ['邮箱', 'KYC'],
-  },
-  {
-    query: 'API Key权限有哪些',
-    expectedIntent: 'api',
-    mustContain: ['只读', 'API Key'],
-  },
-  {
-    query: '我的订单一直未成交是怎么回事',
-    expectedIntent: 'order',
-    mustContain: ['委托', 'FOK'],
-  },
-  {
-    query: '账户冻结了怎么解冻',
-    expectedIntent: 'account',
-    mustContain: ['工单', '工作日'],
-  },
-  {
-    query: '平台会报税吗，需要交1099表吗',
-    expectedIntent: 'compliance',
-    mustContain: ['1099-DA', 'CSV'],
-  },
-]
+describe('retrieval golden set — production entry point', () => {
+  const originalKey = process.env.OPENAI_API_KEY
 
-describe('RAG golden eval — intent + knowledge retrieval', () => {
-  test.each(GOLDEN_CASES)('$query', ({ query, expectedIntent, mustContain }) => {
-    // Step 1: intent classification
+  beforeAll(() => {
+    // Pin the offline branch: no network, no embeddings, deterministic.
+    // The vector path needs its own suite against a seeded database — it is
+    // NOT covered here, and pretending otherwise is the bug this file had.
+    delete process.env.OPENAI_API_KEY
+  })
+
+  afterAll(() => {
+    if (originalKey !== undefined) process.env.OPENAI_API_KEY = originalKey
+  })
+
+  test.each(GOLDEN_CASES)('$query', async ({ query, expectedIntent, contextMustContain }) => {
     const intent = classifyIntent(query)
     expect(intent).toBe(expectedIntent)
 
-    // Step 2: knowledge retrieval (mirrors intentFilter + cross-reference fallback in search.ts)
-    const primary = FAQ_DOCS.filter(d => d.intent === intent)
-    const relatedIds = new Set(primary.flatMap(d => d.related))
-    const related = FAQ_DOCS.filter(d => relatedIds.has(d.id) && d.intent !== intent)
-    const allChunks = [...primary, ...related]
+    const chunks = await getKnowledgeContext(query, intent)
+    const context = formatContext(chunks)
 
-    const combinedText = allChunks.map(d => `${d.title} ${d.content}`).join('\n')
-
-    for (const kw of mustContain) {
-      expect(combinedText).toContain(kw)
+    for (const fact of contextMustContain) {
+      expect(context).toContain(fact)
     }
   })
+
+  test('retrieval returns nothing for an intent with no documents', async () => {
+    // Guards the shared assumption behind every case above: that a passing
+    // assertion means retrieval selected something, not that it returned the
+    // whole corpus. If unknown intents also yielded content, the checks above
+    // would pass without retrieval doing any work.
+    const chunks = await getKnowledgeContext('今天天气怎么样', 'unknown')
+    expect(chunks).toHaveLength(0)
+  })
+})
+
+describe('known retrieval gaps — facts the corpus has but retrieval cannot reach', () => {
+  // These assert the defect is still present. When retrieval is fixed, these
+  // go red — which is the point: a silent fix would otherwise leave FINDINGS.md
+  // describing a problem that no longer exists.
+  const originalKey = process.env.OPENAI_API_KEY
+  beforeAll(() => { delete process.env.OPENAI_API_KEY })
+  afterAll(() => { if (originalKey !== undefined) process.env.OPENAI_API_KEY = originalKey })
+
+  test.each(KNOWN_RETRIEVAL_GAPS)(
+    '$unreachableFact is in the corpus but unreachable for "$query"',
+    async ({ query, intent, unreachableFact, livesIn }) => {
+      // The fact exists in the corpus...
+      const doc = FAQ_DOCS.find(d => d.id === livesIn)
+      expect(doc?.content).toContain(unreachableFact)
+
+      // ...and retrieval still does not surface it.
+      const chunks = await getKnowledgeContext(query, intent as never)
+      const context = formatContext(chunks)
+      expect(context).not.toContain(unreachableFact)
+    },
+  )
 })

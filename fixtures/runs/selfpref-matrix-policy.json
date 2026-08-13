@@ -1,0 +1,181 @@
+{
+  "judgePrompt": "base + extrapolation policy",
+  "models": [
+    "deepseek-chat",
+    "moonshotai/Kimi-K2.6",
+    "MiniMaxAI/MiniMax-M2.7"
+  ],
+  "queries": [
+    "maker taker费率是多少",
+    "合约手续费怎么算",
+    "怎么提币，步骤是什么",
+    "提币要多久到账",
+    "KYC认证需要什么材料",
+    "如何充值USDT入金",
+    "如何开启2FA保护账户",
+    "永续合约最高多少倍杠杆",
+    "怎么注册Acme账号",
+    "API Key权限有哪些",
+    "我的订单一直未成交是怎么回事",
+    "账户冻结了怎么解冻",
+    "平台会报税吗，需要交1099表吗"
+  ],
+  "usable": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false
+  ],
+  "scores": {
+    "deepseek-chat": {
+      "deepseek-chat": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        0.85,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0.9,
+        1
+      ],
+      "moonshotai/Kimi-K2.6": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        0.9,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0.9,
+        1
+      ],
+      "MiniMaxAI/MiniMax-M2.7": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        0.55,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    "moonshotai/Kimi-K2.6": {
+      "deepseek-chat": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        0.9,
+        null,
+        1,
+        1,
+        1,
+        1,
+        null,
+        1
+      ],
+      "moonshotai/Kimi-K2.6": [
+        1,
+        1,
+        0,
+        1,
+        1,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0.8,
+        1
+      ],
+      "MiniMaxAI/MiniMax-M2.7": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0.8,
+        1
+      ]
+    },
+    "MiniMaxAI/MiniMax-M2.7": {
+      "deepseek-chat": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        1,
+        1,
+        1,
+        1,
+        0.9,
+        1,
+        null
+      ],
+      "moonshotai/Kimi-K2.6": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0.75,
+        1
+      ],
+      "MiniMaxAI/MiniMax-M2.7": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    }
+  }
+}

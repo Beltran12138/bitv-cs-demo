@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here.
 
+> **Everything below 2.0.0 is the history of the fixture, not of `assay`.**
+> This repository began as a customer-service chatbot demo for a crypto
+> exchange. In August 2026 it was repurposed: the chat application became the
+> system under test, and the evaluation harness became the project. Entries
+> from that period describe features of the fixture and are kept for provenance.
+
 ---
 
 ## [1.4.0] — 2026-04-27
@@ -113,4 +119,4 @@ All notable changes to this project are documented here.
 - `/api/session` — creates session row on chat open
 - `/api/bot` — keyword-based intent routing (Phase 1)
 - `/chat` user page, `/agent` dashboard page
-- Deployed to Vercel: https://cs-demo-beta.vercel.app
+- Deployed to Vercel (project deleted 2026-08-13; the harness needs no deployment)
