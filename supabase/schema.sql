@@ -89,3 +89,10 @@ $$;
 -- ── Realtime ─────────────────────────────────────────────────────────────────
 alter publication supabase_realtime add table messages;
 alter publication supabase_realtime add table sessions;
+
+-- ── Row level security ───────────────────────────────────────────────────────
+-- This file creates tables WITHOUT RLS, which in Supabase means the public
+-- anon key can read and write every one of them. Apply
+-- `migrations/20260813_enable_rls.sql` immediately after this file. It is not
+-- inlined here so that the change is visible in migration history rather than
+-- buried in a schema dump.

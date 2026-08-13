@@ -353,3 +353,39 @@ prompt, same frozen-answer protocol.
 | 5 | Is `faithfulness` binary in practice for every judge, or only these three? | more judges |
 | 6 | ~~Does an explicit extrapolation policy collapse the split?~~ | **answered: yes, 53%→83% agreement — and it licensed a real miss** |
 | 7 | Does the permissive rubric's licensed miss show up as lower correctness? | needs correctness labels (blocked on #3) |
+| 8 | Is RLS actually on in the live database? | `migrations/20260813_enable_rls.sql` is written but **unapplied** — see below |
+
+---
+
+## #6 — Every table shipped without row level security
+
+**2026-08-13** · `git grep -niE "rls\|policy" supabase/` → zero matches
+
+`schema.sql` creates four tables and enables none of them for RLS. In Supabase
+that means the `anon` key — which is `NEXT_PUBLIC_`, i.e. compiled into the
+browser bundle — could read and write all of them, including the full
+`messages` transcript store.
+
+**Not verified against the live database.** An attempt to read `messages` with
+the anon key was blocked by a local permission gate, correctly, and was not
+retried. So this is a defect established in the schema, not an observed
+exploit. The deployment has since been deleted, which removes the public
+surface but not the database.
+
+The fix is written and **not yet applied**:
+`migrations/20260813_enable_rls.sql` turns RLS on everywhere, grants `anon`
+read on `knowledge_chunks` only (the FAQ corpus, which the retrieval path
+needs), and gives `sessions` / `messages` / `message_feedback` no policy at
+all — under RLS, no policy means denied.
+
+It cannot go further than that. The fixture has no authentication: the visitor
+widget and the agent dashboard hold the *same* anon key, and the dashboard is
+meant to see every session while a visitor should see only their own. No policy
+separates those without an identity to key on. Rewriting the fixture's auth is
+out of scope for a harness that never touches those tables.
+
+Consequence, stated rather than hidden: applying it **breaks the fixture's live
+chat**, because the widgets insert rows and subscribe to `postgres_changes`
+directly with the anon key and Realtime enforces RLS.
+`migrations/20260813_dev_open_rls.sql` restores that for local use and opens
+with a warning explaining exactly what it gives away.
