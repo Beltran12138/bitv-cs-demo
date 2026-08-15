@@ -16,6 +16,24 @@ Only after those pass does a score mean anything.
 > published results yet. Nothing here is production-tested. See
 > [Honest limitations](#honest-limitations).
 
+### One question, three domains
+
+**"Are these sources answering the same question?"**
+
+Most tooling asks whether independent sources *agree*. This one asks whether they are
+measuring the same thing at all — two sources can differ by 68 points and both be right.
+
+The same five failure families keep surfacing in three unrelated domains. This repo is
+the **LLM-judge** instance.
+
+| repo | domain | the question it asks |
+|---|---|---|
+| [decision-confidence](https://github.com/Beltran12138/decision-confidence) | third-party risk vendors | do these vendors answer the same question? |
+| **assay** ← you are here | LLM-as-judge | does this metric measure what its name claims? |
+| [prophetmap](https://github.com/Beltran12138/prophetmap) | self-built equity scoring | does my own score survive my own rule? |
+
+Cross-domain evidence → [`failure-families.md`](https://github.com/Beltran12138/decision-confidence/blob/main/docs/failure-families.md)
+
 ---
 
 ## Why this exists
