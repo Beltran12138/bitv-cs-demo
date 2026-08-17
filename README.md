@@ -117,10 +117,18 @@ npm install
 npm test            # golden cases: intent routing + retrieval, no network
 npm run eval        # judge-scored eval of the reference agent
 npm run selfpref    # generator × judge matrix (see below)
+npm run sensitivity # can this harness still detect a failure it is known to have?
 ```
 
 `eval` needs `DEEPSEEK_API_KEY`. `selfpref` additionally needs
 `ASSAY_JUDGE_BASE_URL` and `ASSAY_JUDGE_API_KEY` for the cross-family judges.
+
+`sensitivity` is the control the other two do not contain: known-label inputs in,
+known verdicts expected out. It exits 1 when a control fails and 2 when one could
+not run, because a control that did not run is not a control that passed. **It
+currently exits 1** — on purpose. Both failures are findings, not bugs in the
+script: judges miss a hallucination at realistic density, and the cases dropped
+from the matrix are the same three every run. See FINDINGS #7.
 
 `selfpref` runs every model as both writer and grader and reports the residual
 on the diagonal after subtracting each model's leniency and each model's

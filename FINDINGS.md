@@ -312,6 +312,16 @@ context" does not distinguish one number from a fabricated procedure, so the
 lenient reading now has cover. **The rubric bought agreement partly by
 licensing a real miss.**
 
+> **Correction, 2026-08-16 — the attribution in the paragraph above is wrong.**
+> It was never checked against the baseline run, which was already on disk. In
+> `selfpref-matrix.json` the same answer scores **0.90 / 0.80 / 0.90** — under
+> the *original* prompt, with no extrapolation rule, all three judges miss the
+> hallucination. The policy sentence did not license the miss; the only thing it
+> changed on this question is that MiniMax went from 0.90 to 0.00, i.e. it made
+> one judge **stricter**. The miss is a property of the judges and the answer,
+> not of the rubric edit. The sentence that follows this box still holds, but it
+> is not supported by this example. See #7.
+
 > Sharpening a rubric does not eliminate disagreement; it relocates it to the
 > rubric's own boundary. Agreement went up. Whether correctness went up is a
 > separate question this run cannot answer — which is what
@@ -351,9 +361,11 @@ prompt, same frozen-answer protocol.
 | 3 | Actual correctness of the reference agent | human labels, or τ²-bench state diffs |
 | 4 | Is the `grounded_falsehood` threshold pair (0.8 / 0.5) anywhere near right? | labelled cases; currently an uncalibrated guess |
 | 5 | Is `faithfulness` binary in practice for every judge, or only these three? | more judges |
-| 6 | ~~Does an explicit extrapolation policy collapse the split?~~ | **answered: yes, 53%→83% agreement — and it licensed a real miss** |
-| 7 | Does the permissive rubric's licensed miss show up as lower correctness? | needs correctness labels (blocked on #3) |
+| 6 | ~~Does an explicit extrapolation policy collapse the split?~~ | **answered: yes, 53%→83% agreement.** ~~and it licensed a real miss~~ — corrected in #7: the miss predates the policy |
+| 7 | Does the permissive rubric make correctness worse? | needs correctness labels (blocked on #3). The one example used to argue it did is now withdrawn — see #7 |
 | 8 | Is RLS actually on in the live database? | `migrations/20260813_enable_rls.sql` is written but **unapplied** — see below |
+| 9 | At what hallucination density does judge sensitivity return? | #7 measures two points (isolated / embedded). The curve between them is unmeasured |
+| 10 | Do the three permanently-dropped cases change the matrix? | needs a run with judge `max_tokens` raised past truncation — see #7 |
 
 ---
 
@@ -389,3 +401,121 @@ chat**, because the widgets insert rows and subscribe to `postgres_changes`
 directly with the anon key and Realtime enforces RLS.
 `migrations/20260813_dev_open_rls.sql` restores that for local use and opens
 with a warning explaining exactly what it gives away.
+
+---
+
+## #7 — The positive control passes on a distilled failure and fails on the real one
+
+**2026-08-16** · `npm run sensitivity`
+
+Every number in #2–#5 comes from a metric that reports a value but never
+reports whether it can still tell anything apart. `scripts/assay-sensitivity.ts`
+adds that check in three layers: a parser control (offline), a judge control
+(one context, three answers with verified labels), and an audit of the cases the
+matrix drops.
+
+The pattern is taken from a local negotiation-game testbed that is not
+published. There, a four-way defection classifier reported `plan_failure = 0%`
+across 120 games, and a synthetic positive control was the only way to separate
+"no execution failures occurred" from "this metric is blind to them". It was the
+former — but the conclusion was worth nothing until the control ran.
+
+### The judge control, on one context, three answers
+
+Same context (`如何充值USDT入金`), same judges, `temperature = 0`:
+
+```
+judge            supported   hallucination   hallucination
+                             (distilled)     (as generated)
+deepseek-chat        1.00        0.00             0.90
+Kimi-K2.6            1.00        0.00             0.80
+MiniMax-M2.7         1.00        0.00             0.90
+```
+
+Both hallucinated answers assert the same unsupported claims — TRC20/ERC20/BEP20,
+CNY, a minimum deposit amount — and the script verifies that none of those
+strings appears in the context before grading anything against the label. The
+difference is only density: the distilled version is those claims with the
+grounded material stripped out; the other is the answer deepseek-chat actually
+produced, where they sit inside four paragraphs of correctly grounded text.
+
+**Discrimination goes from 1.00 to 0.10–0.20.** All three judges detect the
+fabrication in isolation. None of them detects it in situ.
+
+The right-hand column reproduces the 2026-08-13 baseline run cell for cell
+(`0.9 / 0.8 / 0.9` in `fixtures/runs/selfpref-matrix.json`), three days apart.
+This is not a sampling artefact.
+
+**What this says about positive controls generally.** A control built the
+obvious way — take the failure, make it unmistakable, check the metric sees it —
+would have printed three green ticks here and licensed every faithfulness number
+in this repo. It measures whether the metric is *blind*, which is a much weaker
+claim than whether the metric *works at the effect size that occurs*. The same
+mistake killed a conclusion in the testbed mentioned above: `wait` was made a
+strictly dominated action, so "no idle-drift observed" was a weak test rather
+than a finding.
+
+> A positive control is itself a measurement, and it has its own construct
+> problem: passing it establishes sensitivity to the control, not to the case.
+
+### The dropped cases are a stratum, not a sample
+
+`assay-selfpref.ts` compares only cases every judge could parse, and reported
+n = 10 of 13. Which three, and why, was never asked.
+
+```
+run                            usable   unreadable cells   by judge
+selfpref-matrix.json           10/13           5           deepseek 0 · Kimi 3 · MiniMax 2
+selfpref-matrix-policy.json    10/13           3           deepseek 0 · Kimi 2 · MiniMax 1
+
+dropped cases (both runs):  #6 如何开启2FA保护账户
+                            #11 账户冻结了怎么解冻
+                            #12 平台会报税吗，需要交1099表吗
+
+cross-run Jaccard overlap of the dropped set:  1.00
+context length: dropped mean 523 chars vs kept 431
+                dropped rank among 13 by context length: 1, 2, 5
+```
+
+Three signals, all pointing the same way:
+
+1. **The non-reasoning judge never drops anything.** All eight unreadable cells
+   across both runs come from the two reasoning models, whose chain of thought
+   has to fit inside `max_tokens` before a verdict can appear.
+2. **The same three cases fail in two independent runs.** If drops were API
+   noise, two runs choosing the identical 3 of 13 has probability 1/286 under a
+   uniform model.
+3. **They are the longest contexts.** Two of the three are the longest in the
+   corpus. A longer prompt leaves a reasoning judge less room to close its
+   `<think>` block.
+
+So the mechanism is truncation, and the dropped set is defined by input length —
+which is to say the matrix means describe *the cases short enough to parse*, not
+the corpus. This is the same shape as the availability skew in
+`decision-confidence`, where a liquidity source was missing for 4.9% of scam
+tokens and 61.6% of normal ones: **absence carried the label, and a threshold
+sweep could not see it.** Here absence carries length, and an average over
+survivors cannot see it either.
+
+`npm run sensitivity` exits 1 on this, deliberately. It is fixable — raise
+`max_tokens`, or retry unreadable cells — and reporting `n = 10` and moving on
+is not the fix.
+
+### One correction it forced
+
+FINDINGS #5 argued that the explicit extrapolation policy "licensed a real
+miss", citing this deposit question. The baseline run was already on disk and
+showed `0.90 / 0.80 / 0.90` — all three judges missed it *before* the policy
+existed. The claim is withdrawn above. The policy's only effect on this question
+was to make MiniMax stricter (0.90 → 0.00).
+
+**Not established:**
+
+- **Where between the two densities sensitivity returns.** Two points, not a
+  curve. One context, one hallucination type (invented specifics), three judges.
+- **Whether the wild answer's 0.80–0.90 is *wrong*.** It is graded against the
+  context by string-absence, not against a human label. A judge could argue the
+  claims are conventional rather than fabricated — which is itself an undefined
+  rubric, i.e. #5's problem again.
+- **Whether recovering the three dropped cases changes any residual.** They have
+  never been scored by all three judges.
